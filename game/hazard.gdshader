@@ -2,6 +2,8 @@ shader_type spatial;
 render_mode cull_disabled;
 uniform bool water = false;
 uniform vec4 ellipse = vec4(0.0,0.0,10.0,10.0);
+uniform int pond_count = 0;
+uniform vec4 pond_ellipses[24];
 varying vec3 position_world;
 varying vec3 normal_world;
 void vertex(){
@@ -17,6 +19,15 @@ void fragment(){
  vec2 p=position_world.xz;
  float edge=length((p-ellipse.xy)/ellipse.zw);
  if(water){
+  bool wet=false;
+  float union_edge=10.0;
+  for(int h=0;h<24;h++) {
+   if(h>=pond_count) break;
+   float pond_edge=length((p-pond_ellipses[h].xy)/pond_ellipses[h].zw);
+   if(pond_edge<1.0) { wet=true; union_edge=min(union_edge,pond_edge); }
+  }
+  if(pond_count>0 && !wet) discard;
+  if(pond_count>0) edge=union_edge;
   float wave_a=sin(dot(p,vec2(1.8,1.15))+TIME*1.35);
   float wave_b=sin(dot(p,vec2(-1.2,2.65))-TIME*0.92);
   float ripple=wave_a*0.55+wave_b*0.45;

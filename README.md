@@ -6,6 +6,10 @@ A playable native Godot 4.7 golf prototype: local hot-seat golf, playful golfers
 
 Open `project.godot` in Godot and press **F6** with the main scene open, or **F5** to run the project. Choose 1–4 players, each golfer, Stroke Play or Skins, and a 3-, 9-, or 18-hole round. Three-hole rounds draw three distinct random holes in random order. Nine-hole rounds offer Front 9 (1–9) or Back 9 (10–18). All eight golfers have identical gameplay stats.
 
+For free remote play, choose **Parsec Remote Play** on the clubhouse screen. The setup card can open Parsec and explains the host flow: enable Hosting, share the computer link, accept each guest, and grant keyboard and mouse permission. Return to the game, choose a player count, and enable **Timing**. Player 1 is the host and remains unadjusted. Before the round, each guest completes three one-way meter passes; the median measured delay corrects that player's clubface evaluation while leaving the visible meter, its speed, and the swing mechanic unchanged.
+
+Parsec requires no game SDK, App ID, submission fee, or game server. It streams the host's screen and merges guest input into the existing local hot-seat controls. On macOS, Parsec hosting requires Screen Recording and Accessibility permission. Guests need keyboard and mouse permission because Breakfast Balls does not currently use gamepads. For safer sharing, close private windows before hosting; Parsec's macOS host does not support its Approved Apps restriction.
+
 - Aim by dragging across the course or using Left/Right.
 - Select one of the 14 clubs along the bottom; Q/E or mouse wheel cycles clubs.
 - In the gold swing pad, click and hold near the top, pull down for power, then push forward and release. Sideways offset at the bottom sets swing path. The moving meter sets clubface at release; returning off-center adds face error. Power retains the deepest backswing, so a trackpad works too.
@@ -14,6 +18,14 @@ Open `project.godot` in Godot and press **F6** with the main scene open, or **F5
 - S cycles spin, V shows the whole hole, Tab opens the scorecard, H opens help, and Escape pauses.
 - Enter continues after a shot or advances from a completed-hole scorecard.
 - On greens, the gold arrow shows the local downhill direction. Adjust aim and power for the break.
+
+## Breakfast Ball and Pin Challenge
+
+In Stroke Play and Skins, each golfer may retry their first tee shot of the round once. After the ball settles (and after any replay), choose **PLAY IT** / Enter to keep it, or **BREAKFAST BALL** / B to return to the tee. The retry clears that shot and any water/OB penalty, keeps the same golfer and wind, and plays an egg-crack sound with a fresh-start message. The offer expires when you keep the shot; it cannot be saved for a later hole. The HUD marks **BREAKFAST BALL USED**, and the scorecard marks that golfer with an asterisk. Using a Breakfast Ball makes that golfer's round ineligible for club records. Opening-shot records are saved only after choosing to keep the shot, so discarded drives and aces never enter the record book.
+
+Choose **Pin Challenge** in the clubhouse for the closest-to-pin Diner Special. One to four golfers play holes **6, 12, and 16**, with one tee shot each per hole and the same wind for everyone. There are no mulligans or follow-up putts. A hole-out earns 100 points. Otherwise, finish on the green to earn `max(0, 100 - ceil(distance in feet))`, capped at 99; distance is measured at rest to the nearest tenth of a foot. Missed greens, water, and OB earn zero. The scorecard shows distance and points for each attempt. Highest total out of 300 wins; tied leaders share the win. Solo play shows your total, and **Another Serving** starts a fresh challenge with the same players. Challenge results do not affect the normal golf record book.
+
+Run feature checks with `godot --headless --path . --script res://tests/breakfast_challenge_tests.gd`. They cover opening-shot decisions, penalties, record handling, replay return, and a full four-player challenge using ball physics. For rendered menu/result/scorecard checks, run `godot --path . --script res://tests/feature_visual_qa.gd`; screenshots are written to `/private/tmp/breakfast-*.png`. These checks supplement human playtesting of swing feel.
 
 ## Rules and physics
 
@@ -65,6 +77,6 @@ The broadcast presentation pass adds the original 26.7-second looping cue **Magn
 
 Main scene: `game/main.tscn`. Gameplay and input: `game/main.gd`. Shared course geometry/terrain: `game/course.gd`. Roster, club and hole data: `game/data.gd`. Interface: `game/hud.gd`.
 
-Run automated checks with `godot --headless --path . --script res://tests/golf_tests.gd`. These cover input events, settling shots, a real short putt, penalties, player separation, Skins carryovers, pause, and 18-hole scoring progression. Full-round scoring tests inject hole scores; they are not a claim that every hole has been manually played. Visual QA: `godot --path . -- --qa --qa-play --qa-exit` saves a screenshot in `/private/tmp/breakfast-balls-qa.png`.
+Run automated checks with `godot --headless --path . --script res://tests/golf_tests.gd`. These cover input events, settling shots, a real short putt, penalties, player separation, Skins carryovers, pause, and 18-hole scoring progression. Full-round scoring tests inject hole scores; they are not a claim that every hole has been manually played. Visual QA: `godot --path . -- --qa --qa-play --qa-exit` saves a screenshot in `/private/tmp/breakfast-balls-qa.png`. Use `--qa-calibration` for remote timing or `--qa-parsec` for the Parsec setup card.
 
 This first version does not include saved rounds, gamepad support, authored character animations, tournament-accurate rules, or a packaged standalone app. Playtesting should guide the next pass on swing feel, difficulty, camera and art.

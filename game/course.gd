@@ -73,6 +73,19 @@ func material(color: Color, roughness: float = 0.92) -> StandardMaterial3D:
 	m.cull_mode = BaseMaterial3D.CULL_DISABLED
 	return m
 
+func _ellipse_uniforms(source: Array,size: int) -> PackedVector4Array:
+	var result:=PackedVector4Array()
+	result.resize(size)
+	for i in range(mini(source.size(),size)): result[i]=source[i]
+	return result
+
+func _configure_turf(mat: ShaderMaterial) -> void:
+	# Rendering and lie/penalty checks consume the same bunker and pond ellipses.
+	mat.set_shader_parameter("bunker_count",mini(bunkers.size(),8))
+	mat.set_shader_parameter("bunker_ellipses",_ellipse_uniforms(bunkers,8))
+	mat.set_shader_parameter("pond_count",mini(ponds.size(),24))
+	mat.set_shader_parameter("pond_ellipses",_ellipse_uniforms(ponds,24))
+
 func mesh_node(mesh: Mesh, mat: Material, pos: Vector3, parent: Node = self) -> MeshInstance3D:
 	var n := MeshInstance3D.new()
 	n.mesh = mesh
@@ -154,9 +167,9 @@ func build(index: int) -> void:
 	# Draw bunkers after the green and its mowing stripes so sand cuts cleanly
 	# through the putting surface instead of inheriting painted turf ribbons.
 	for e in bunkers:
-		_patch(Vector4(e.x,e.y,e.z+2.2,e.w+2.2), Color("537646"), 0.10)
-		_patch(Vector4(e.x,e.y,e.z+1.15,e.w+1.15), Color("8b7652"), 0.12)
-		_patch(e, Color("eedbab"), 0.16)
+		_ring_patch(Vector4(e.x,e.y,e.z+2.2,e.w+2.2),Vector4(e.x,e.y,e.z+1.15,e.w+1.15),Color("537646"),0.10)
+		_ring_patch(Vector4(e.x,e.y,e.z+1.15,e.w+1.15),e,Color("8b7652"),0.12)
+		_patch(e, Color("eedbab"), 0.20)
 	_patch(Vector4(0,0,8,5), Color("86ac5d"), 0.18)
 	for side in [-1,1]:
 		sphere(ground_point(side*5,0,0.20),0.18,Color("f4de97"))
@@ -181,14 +194,25 @@ func _build_ground() -> void:
 		var z: float = 65.0 - zi*step
 		for xi in range(70):
 			var x: float = -175.0 + xi*step
-			for offset in [Vector2(0,0),Vector2(step,0),Vector2(0,-step),Vector2(step,0),Vector2(step,-step),Vector2(0,-step)]:
-				var p := ground_point(x+offset.x,z+offset.y)
-				var fair: bool = p.z < -10 and p.z > -length_m and absf(p.x-center_x(p.z)) < fairway_width(p.z)
-				var col := Color("315b36")
-				if fair: col = Color("659647") if int((-p.z+p.x*0.35)/10.0)%2 == 0 else Color("59863d")
-				else: col = col.lightened(0.035*sin(p.z*0.08+p.x*0.12))
-				st.set_color(col)
-				st.add_vertex(p)
+			# Refine only cells touching a bunker. This prevents broad terrain
+			# triangles from spanning its bowl without quadrupling the whole course.
+			var divisions: int=1
+			for e in bunkers:
+				if x+step>=e.x-e.z-2.2 and x<=e.x+e.z+2.2 and z>=e.y-e.w-2.2 and z-step<=e.y+e.w+2.2:
+					divisions=4
+					break
+			var fine: float=step/divisions
+			for sy in range(divisions):
+				for sx in range(divisions):
+					var cell_x: float=x+sx*fine; var cell_z: float=z-sy*fine
+					for offset in [Vector2(0,0),Vector2(fine,0),Vector2(0,-fine),Vector2(fine,0),Vector2(fine,-fine),Vector2(0,-fine)]:
+						var p := ground_point(cell_x+offset.x,cell_z+offset.y)
+						var fair: bool = p.z < -10 and p.z > -length_m and absf(p.x-center_x(p.z)) < fairway_width(p.z)
+						var col := Color("315b36")
+						if fair: col = Color("659647") if int((-p.z+p.x*0.35)/10.0)%2 == 0 else Color("59863d")
+						else: col = col.lightened(0.035*sin(p.z*0.08+p.x*0.12))
+						st.set_color(col)
+						st.add_vertex(p)
 	st.generate_normals()
 	var m := ShaderMaterial.new()
 	m.shader=preload("res://game/turf.gdshader")
@@ -197,13 +221,16 @@ func _build_ground() -> void:
 	m.set_shader_parameter("par_five",Data.HOLES[hole_index][1]==5)
 	m.set_shader_parameter("route_x",PackedFloat32Array(Layouts.HOLES[hole_index].x))
 	m.set_shader_parameter("route_width",PackedFloat32Array(Layouts.HOLES[hole_index].w))
+	_configure_turf(m)
 	terrain_mesh = mesh_node(st.commit(),m,Vector3.ZERO)
 
 func _patch(e: Vector4, color: Color, offset: float) -> void:
 	var st := SurfaceTool.new()
 	st.begin(Mesh.PRIMITIVE_TRIANGLES)
 	var is_hazard: bool=color==Color("4b9390") or color==Color("eedbab")
-	var rings: int=9 if is_hazard else 1
+	# Every overlay follows the terrain at short intervals. Large one-piece green
+	# fans can otherwise bridge across an adjacent bunker and show through its sand.
+	var rings: int=12
 	var sectors: int=96 if is_hazard else 64
 	for ring in range(rings):
 		var r0: float=float(ring)/rings; var r1: float=float(ring+1)/rings
@@ -227,11 +254,33 @@ func _patch(e: Vector4, color: Color, offset: float) -> void:
 		var turf:=ShaderMaterial.new(); turf.shader=preload("res://game/turf.gdshader")
 		turf.set_shader_parameter("use_vertex_color",false); turf.set_shader_parameter("turf_color",color.darkened(0.12)); mat=turf
 		turf.set_shader_parameter("cut_kind",0 if e.x==0 and e.y==0 else 4)
+		_configure_turf(turf)
 	if is_hazard:
 		var hazard_mat:=ShaderMaterial.new(); hazard_mat.shader=preload("res://game/hazard.gdshader")
 		hazard_mat.set_shader_parameter("water",color==Color("4b9390"))
 		hazard_mat.set_shader_parameter("ellipse",e)
 		mat=hazard_mat
+	mesh_node(st.commit(),mat,Vector3.ZERO)
+
+func _ring_patch(outer: Vector4,inner: Vector4,color: Color,offset: float) -> void:
+	# A rim is an annulus, never a filled disc. Keeping its center empty guarantees
+	# that turf and exposed-earth geometry cannot overlap the sand interior.
+	var st:=SurfaceTool.new(); st.begin(Mesh.PRIMITIVE_TRIANGLES)
+	var sectors: int=96
+	for i in range(sectors):
+		var a: float=TAU*i/sectors; var b: float=TAU*(i+1)/sectors
+		var points=[Vector3(inner.x+cos(a)*inner.z,0,inner.y+sin(a)*inner.w),Vector3(outer.x+cos(a)*outer.z,0,outer.y+sin(a)*outer.w),Vector3(inner.x+cos(b)*inner.z,0,inner.y+sin(b)*inner.w),Vector3(outer.x+cos(b)*outer.z,0,outer.y+sin(b)*outer.w)]
+		for k in [0,1,2,2,1,3]:
+			var p: Vector3=points[k]
+			p.y=height_at(p.x,p.z)+offset
+			st.add_vertex(p)
+	st.generate_normals()
+	var mat: Material=material(color)
+	if color.g>color.r:
+		var turf:=ShaderMaterial.new(); turf.shader=preload("res://game/turf.gdshader")
+		turf.set_shader_parameter("use_vertex_color",false); turf.set_shader_parameter("turf_color",color.darkened(0.12)); turf.set_shader_parameter("cut_kind",4)
+		_configure_turf(turf)
+		mat=turf
 	mesh_node(st.commit(),mat,Vector3.ZERO)
 
 func _build_water_surface() -> void:
@@ -247,16 +296,13 @@ func _build_water_surface() -> void:
 		var z: float=min_z+iz*step
 		for ix in range(nx):
 			var x: float=min_x+ix*step
-			var center:=Vector3(x+step*0.5,0,z+step*0.5)
-			var wet: bool=false
-			for e in ponds:
-				if in_ellipse(center,e): wet=true; break
-			if not wet: continue
 			for p in [Vector2(x,z),Vector2(x+step,z),Vector2(x,z+step),Vector2(x,z+step),Vector2(x+step,z),Vector2(x+step,z+step)]:
 				st.add_vertex(ground_point(p.x,p.y,0.12))
 	st.generate_normals()
 	var water_mat:=ShaderMaterial.new(); water_mat.shader=preload("res://game/hazard.gdshader")
 	water_mat.set_shader_parameter("water",true)
+	water_mat.set_shader_parameter("pond_count",mini(ponds.size(),24))
+	water_mat.set_shader_parameter("pond_ellipses",_ellipse_uniforms(ponds,24))
 	# Shore color comes from the damp-bank geometry; a large ellipse keeps this
 	# single union surface in the shader's deep-water range.
 	water_mat.set_shader_parameter("ellipse",Vector4((min_x+max_x)*0.5,(min_z+max_z)*0.5,maxf(1.0,max_x-min_x)*8.0,maxf(1.0,max_z-min_z)*8.0))
@@ -265,11 +311,18 @@ func _build_water_surface() -> void:
 func _strip(x: float,z1: float,z2: float,width: float,col: Color) -> void:
 	var st := SurfaceTool.new()
 	st.begin(Mesh.PRIMITIVE_TRIANGLES)
-	for p in [Vector2(x,z1),Vector2(x,z2),Vector2(x+width,z1),Vector2(x+width,z1),Vector2(x,z2),Vector2(x+width,z2)]:
-		st.add_vertex(ground_point(p.x,p.y,0.18))
+	# Segment mowing stripes so they bend into nearby terrain instead of forming a
+	# single long plane that can cut across and appear inside a bunker.
+	var segments: int=maxi(1,ceili(absf(z2-z1)/1.25))
+	for i in range(segments):
+		var za: float=lerpf(z1,z2,float(i)/segments)
+		var zb: float=lerpf(z1,z2,float(i+1)/segments)
+		for p in [Vector2(x,za),Vector2(x,zb),Vector2(x+width,za),Vector2(x+width,za),Vector2(x,zb),Vector2(x+width,zb)]:
+			st.add_vertex(ground_point(p.x,p.y,0.18))
 	st.generate_normals()
 	var turf:=ShaderMaterial.new(); turf.shader=preload("res://game/turf.gdshader")
 	turf.set_shader_parameter("use_vertex_color",false); turf.set_shader_parameter("turf_color",col.darkened(0.12))
+	_configure_turf(turf)
 	mesh_node(st.commit(),turf,Vector3.ZERO)
 
 func _instances(mesh: Mesh, transforms: Array, color: Color) -> void:

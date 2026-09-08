@@ -18,6 +18,11 @@ var state: String = "menu"
 var previous_state: String = "aim"
 var player_count: int = 1
 var mode: int = 0
+const CLOSEST_TO_PIN: int = 2
+const CHALLENGE_HOLES: Array = [5,11,15]
+var breakfast_offer: bool = false
+var pending_shot_records: Array = []
+var breakfast_flash: float = 0.0
 var round_length: int = 3
 var nine_side: int = 0
 var round_holes: Array = []
@@ -89,6 +94,16 @@ var replay_duration: float=3.8
 var replay_title: String=""
 var replay_end_position:=Vector3.ZERO
 var replay_return_state: String="result"
+var remote_timing_enabled: bool=false
+var timing_offsets: Array=[0.0,0.0,0.0,0.0]
+var calibration_player: int=1
+var calibration_samples: Array=[]
+var calibration_clock: float=0.0
+const CALIBRATION_CENTER: float=0.8
+const CALIBRATION_DURATION: float=1.6
+const MAX_TIMING_OFFSET: float=0.35
+var parsec_setup_open: bool=false
+var parsec_status: String="FREE REMOTE PLAY · HOST SHARES FROM PARSEC"
 
 var leaderboard_path: String="user://leaderboard.json"
 
@@ -122,6 +137,7 @@ func _save_leaderboard() -> void:
 	if file: file.store_string(JSON.stringify(leaderboard,"  "))
 
 func begin_name_entry() -> void:
+	timing_offsets=[0.0,0.0,0.0,0.0]
 	name_entry_index=0
 	name_entry_value=str(player_tags[0]).to_upper().left(5)
 	state="name_entry"
@@ -131,21 +147,69 @@ func _accept_name_entry() -> void:
 	player_tags[name_entry_index]=name_entry_value
 	name_entry_index+=1
 	if name_entry_index>=player_count:
-		_save_leaderboard(); start_round()
+		_save_leaderboard()
+		if remote_timing_enabled and player_count>1: begin_calibration()
+		else: start_round()
 	else:
 		name_entry_value=str(player_tags[name_entry_index]).to_upper().left(5)
 
+func begin_calibration() -> void:
+	calibration_player=1
+	calibration_samples.clear()
+	calibration_clock=0.0
+	state="calibration"
+
+func calibration_meter() -> float:
+	var progress: float=clampf(calibration_clock/CALIBRATION_DURATION,0.0,1.0)
+	return lerpf(-0.85,0.85,smoothstep(0.0,1.0,progress))
+
+func record_calibration_sample() -> void:
+	if state!="calibration" or calibration_clock<CALIBRATION_CENTER: return
+	calibration_samples.append(clampf(calibration_clock-CALIBRATION_CENTER,0.0,MAX_TIMING_OFFSET))
+	if calibration_samples.size()<3:
+		calibration_clock=0.0
+		return
+	calibration_samples.sort()
+	timing_offsets[calibration_player]=float(calibration_samples[1])
+	calibration_player+=1
+	calibration_samples.clear()
+	calibration_clock=0.0
+	if calibration_player>=player_count: start_round()
+
+func player_timing_offset(index: int=player_index) -> float:
+	if not remote_timing_enabled or index<=0 or index>=timing_offsets.size(): return 0.0
+	return float(timing_offsets[index])
+
+func evaluated_face_meter() -> float:
+	return sin((swing_clock-player_timing_offset())*5.6*contact_difficulty())*0.85
+
+func open_parsec() -> void:
+	if OS.get_name()=="macOS" and DirAccess.dir_exists_absolute("/Applications/Parsec.app"):
+		var process_id: int=OS.create_process("/usr/bin/open",["-a","Parsec"])
+		parsec_status="PARSEC OPENED · SHARE THIS COMPUTER" if process_id>=0 else "Open Parsec from Applications"
+	else:
+		OS.shell_open("https://parsec.app/downloads")
+		parsec_status="INSTALL OR OPEN PARSEC · THEN SHARE THIS COMPUTER"
+
 func _record(key: String,value: float,lower_is_better: bool,tag: String,detail: String) -> bool:
-	if not records_enabled: return false
+	if not records_enabled or mode==CLOSEST_TO_PIN: return false
+	if key=="longest_drive" and not players.is_empty() and players[player_index].breakfast_used: return false
 	var old: float=float(leaderboard[key]["value"])
 	if (lower_is_better and value>=old) or (not lower_is_better and value<=old): return false
+	if breakfast_offer and key=="longest_drive":
+		pending_shot_records.append([key,value,lower_is_better,tag,detail])
+		return true
 	leaderboard[key]={"value":value,"name":tag,"detail":detail}
 	record_notice="NEW CLUB RECORD · %s"%detail.to_upper()
 	_save_leaderboard()
 	return true
 
 func _count_hole_in_one(tag: String) -> void:
-	if not records_enabled: return
+	if not records_enabled or mode==CLOSEST_TO_PIN: return
+	if not players.is_empty() and players[player_index].breakfast_used: return
+	if breakfast_offer:
+		pending_shot_records.append(["ace",tag])
+		return
 	var record: Dictionary=leaderboard.get("hole_in_ones",_default_leaderboard()["hole_in_ones"])
 	var by_name: Dictionary=record.get("by_name",{})
 	by_name[tag]=int(by_name.get(tag,0))+1
@@ -241,6 +305,9 @@ func _ready() -> void:
 		players[0].pos=course.ground_point(course.pin.x,course.pin.z+60,0.22); _prepare_turn()
 	if "--qa-name" in OS.get_cmdline_user_args(): begin_name_entry()
 	if "--qa-board" in OS.get_cmdline_user_args(): state="leaderboard"
+	if "--qa-parsec" in OS.get_cmdline_user_args(): parsec_setup_open=true
+	if "--qa-calibration" in OS.get_cmdline_user_args():
+		remote_timing_enabled=true; player_count=2; begin_calibration(); calibration_clock=CALIBRATION_CENTER
 	if "--qa-replay" in OS.get_cmdline_user_args():
 		start_round(); replay_path.clear()
 		for i in range(80):
@@ -349,11 +416,13 @@ func _align_golfer() -> void:
 
 func start_round() -> void:
 	players.clear(); hole_index=0; player_index=0; skin_pot=1; last_shot=""; help_open=false; record_notice=""
-	round_holes=select_round_holes(round_length,nine_side)
+	breakfast_offer=false; pending_shot_records.clear(); breakfast_flash=0.0
+	if mode==CLOSEST_TO_PIN: round_length=3
+	round_holes=CHALLENGE_HOLES.duplicate() if mode==CLOSEST_TO_PIN else select_round_holes(round_length,nine_side)
 	round_position=0; hole_index=round_holes[0]
 	if mode==1 and player_count<2: player_count=2
 	for i in range(player_count):
-		players.append({"golfer":roster[i],"tag":player_tags[i],"scores":[],"strokes":0,"pos":Vector3.ZERO,"done":false,"skins":0})
+		players.append({"golfer":roster[i],"tag":player_tags[i],"scores":[],"strokes":0,"pos":Vector3.ZERO,"done":false,"skins":0,"breakfast_used":false,"challenge_results":[],"challenge_shot":{}})
 	start_hole()
 
 func select_round_holes(count: int,side: int) -> Array:
@@ -366,10 +435,11 @@ func select_round_holes(count: int,side: int) -> Array:
 	return holes
 
 func start_hole() -> void:
+	breakfast_offer=false; pending_shot_records.clear()
 	course.build(hole_index)
 	wind=Vector2(sin(hole_index*2.6+0.7),cos(hole_index*1.7))*float(3+hole_index%7)
 	for p in players:
-		p.strokes=0; p.pos=course.tee; p.done=false
+		p.strokes=0; p.pos=course.tee; p.done=false; p.challenge_shot={}
 	player_index=0; hole_done=false; overview=false; last_shot=""
 	_prepare_turn()
 
@@ -458,11 +528,13 @@ func change_club(delta: int) -> void:
 
 func shoot(power: float, error: float=0.0, path: float=0.0) -> void:
 	if state!="aim": return
+	breakfast_offer=mode!=CLOSEST_TO_PIN and round_position==0 and players[player_index].strokes==0 and not players[player_index].breakfast_used and ball_pos.distance_to(course.tee)<0.5
+	pending_shot_records.clear()
 	record_notice=""
 	var requested_power: float=power
 	var excess: float=clampf(power-1.0,0,0.6)
 	power=minf(power,1.0)*(1.0-excess*0.65)
-	error=clampf(error+excess*(0.6+0.4*sin(swing_clock*9.0)),-1,1)
+	error=clampf(error+excess*(0.6+0.4*sin((swing_clock-player_timing_offset())*9.0)),-1,1)
 	tree_hits.clear()
 	players[player_index].strokes+=1
 	shot_origin=ball_pos; last_safe=ball_pos; trail.clear(); trail.append(shot_origin); bounced=false; shot_time=0; shot_distance=0
@@ -581,12 +653,20 @@ func _resolve_trees(old: Vector3) -> void:
 			ball_pos.x=separated.x; ball_pos.z=separated.y
 
 func _penalty(reason: String) -> void:
+	if mode==CLOSEST_TO_PIN:
+		_finish_challenge_shot(false,reason)
+		return
 	players[player_index].strokes+=1
 	ball_pos=last_safe; ball.position=ball_pos
 	_finish_shot(reason+" · +1 PENALTY", shot_comment("PENALTY")+" · Replay from your previous lie.")
 
 func _sink() -> void:
 	ball_pos=course.pin; ball.visible=false; velocity=Vector3.ZERO
+	if mode==CLOSEST_TO_PIN:
+		_finish_challenge_shot(true)
+		_tone(880,0.35,0.15)
+		_begin_replay("BULLSEYE · 100 POINTS")
+		return
 	players[player_index].done=true
 	result_title=Data.score_name(players[player_index].strokes,Data.HOLES[hole_index][1])
 	result_detail="%d strokes · %s" % [players[player_index].strokes,shot_comment("HOLED")]
@@ -604,6 +684,9 @@ func _sink() -> void:
 	if reason!="": _begin_replay(reason)
 
 func _finish_shot(title: String="", detail: String="") -> void:
+	if mode==CLOSEST_TO_PIN:
+		_finish_challenge_shot()
+		return
 	velocity=Vector3.ZERO
 	players[player_index].pos=ball_pos
 	if players[player_index].strokes>=Data.HOLES[hole_index][1]+5:
@@ -637,7 +720,9 @@ func _begin_replay(reason: String) -> void:
 	_draw_trail()
 
 func _check_round_records() -> void:
+	if mode==CLOSEST_TO_PIN: return
 	for i in range(players.size()):
+		if players[i].breakfast_used: continue
 		var scores: Array=players[i].scores
 		var tag: String=players[i].tag
 		if scores.size()==9 and ((round_length==9 and nine_side==0) or round_length==18):
@@ -691,18 +776,66 @@ func distance_text() -> String:
 	var d: float=distance_to_pin()
 	return "%.1f ft" % (d*3.0) if d<30 else "%d yd" % roundi(d)
 
+func can_take_breakfast_ball() -> bool:
+	return state=="result" and breakfast_offer and mode!=CLOSEST_TO_PIN and not players[player_index].breakfast_used
+
+func take_breakfast_ball() -> void:
+	if not can_take_breakfast_ball() or help_open: return
+	var p: Dictionary=players[player_index]
+	p.breakfast_used=true; p.strokes=0; p.done=false; p.pos=course.tee
+	breakfast_offer=false; pending_shot_records.clear(); record_notice=""
+	velocity=Vector3.ZERO; replay_path.clear(); result_title=""; result_detail=""
+	last_shot="FRESH EGG. FRESH START."
+	_prepare_turn()
+	breakfast_flash=2.8
+	# A short, noisy crack with a bright tail; generated locally like the swing audio.
+	if sound_enabled:
+		var stream:=AudioStreamWAV.new()
+		stream.format=AudioStreamWAV.FORMAT_16_BITS; stream.mix_rate=22050
+		var bytes:=PackedByteArray(); bytes.resize(6615*2)
+		var rng:=RandomNumberGenerator.new(); rng.seed=843
+		for i in range(6615):
+			var t: float=float(i)/22050.0
+			var sample: float=rng.randf_range(-1,1)*exp(-t*65)*0.3+sin(t*TAU*1046)*exp(-t*18)*0.1
+			bytes.encode_s16(i*2,int(sample*32767))
+		stream.data=bytes; audio.stream=stream; audio.play()
+
+func _commit_shot_records() -> void:
+	breakfast_offer=false
+	for record in pending_shot_records:
+		if record[0]=="ace": _count_hole_in_one(record[1])
+		else: _record(record[0],record[1],record[2],record[3],record[4])
+	pending_shot_records.clear()
+
+func _finish_challenge_shot(holed: bool=false,miss_reason: String="") -> void:
+	velocity=Vector3.ZERO
+	var feet: float=snappedf(distance_to_pin()*3.0,0.1)
+	var valid: bool=miss_reason=="" and (holed or course.lie_at(ball_pos)=="GREEN")
+	var points: int=100 if holed else clampi(100-ceili(feet),0,99) if valid else 0
+	var p: Dictionary=players[player_index]
+	p.pos=ball_pos; p.done=true
+	p.challenge_shot={"feet":feet,"points":points,"valid":valid,"holed":holed}
+	result_title="BULLSEYE! · 100 POINTS" if holed else "%d POINTS · %.1f FT"%[points,feet] if valid else "MISSED GREEN · 0 POINTS"
+	result_detail="One shot served. Next golfer, same pin." if valid else (miss_reason.capitalize()+" · " if miss_reason!="" else "")+"Finish on the green to score. Next tee, fresh start."
+	state="result"; result_time=0; trail.append(ball_pos)
+	if valid and not holed and feet<=10: _begin_replay("PIN SEEKER · %.1f FEET"%feet)
+
 func advance_turn() -> void:
 	if state!="result": return
+	_commit_shot_records()
 	var all_done: bool=true
 	for p in players:
 		if not p.done: all_done=false
 	if all_done:
 		var scores: Array=[]
 		for p in players:
-			p.scores.append(p.strokes); scores.append(p.strokes)
+			var score: int=p.challenge_shot.points if mode==CLOSEST_TO_PIN else p.strokes
+			p.scores.append(score); scores.append(score)
+			if mode==CLOSEST_TO_PIN: p.challenge_results.append(p.challenge_shot.duplicate())
 		_check_round_records()
 		var winner: int=Data.skin_winner(scores)
 		hole_message="Hole complete. Fresh tee, fresh start."
+		if mode==CLOSEST_TO_PIN: hole_message="Shots served. Highest total wins · 300 points possible."
 		if mode==1:
 			if winner>=0:
 				players[winner].skins+=skin_pot
@@ -735,12 +868,22 @@ func total_score(i: int) -> int:
 	return s
 
 func relative_score(i: int) -> String:
+	if mode==CLOSEST_TO_PIN: return "%d PTS"%total_score(i)
 	var par: int=0
 	for h in range(players[i].scores.size()): par+=Data.HOLES[round_holes[h]][1]
 	var d: int=total_score(i)-par
 	return "E" if d==0 else "%+d" % d
 
 func winners_text() -> String:
+	if mode==CLOSEST_TO_PIN:
+		var high: int=-1
+		var leaders: Array=[]
+		for i in range(players.size()):
+			var points: int=total_score(i)
+			if points>high: high=points; leaders=[players[i].tag]
+			elif points==high: leaders.append(players[i].tag)
+		if players.size()==1: return "%s · %d / 300 points. Another serving?"%[leaders[0],high]
+		return " & ".join(leaders)+(" share the win" if leaders.size()>1 else " wins")+" · %d points!"%high
 	var best: int=-999 if mode==1 else 999
 	var names: Array=[]
 	for i in range(players.size()):
@@ -751,6 +894,8 @@ func winners_text() -> String:
 
 func _process(delta: float) -> void:
 	total_time+=delta
+	if state=="aim" and not help_open: breakfast_flash=maxf(0.0,breakfast_flash-delta)
+	if state=="calibration": calibration_clock=fmod(calibration_clock+delta,CALIBRATION_DURATION)
 	if state=="replay":
 		replay_time+=delta
 		var progress: float=clampf(replay_time/replay_duration,0,1)
@@ -763,7 +908,7 @@ func _process(delta: float) -> void:
 			ball.position=ball_pos
 		if progress>=1.0:
 			ball_pos=replay_end_position; ball.position=ball_pos
-			ball.visible=not players[player_index].done
+			ball.visible=not players[player_index].challenge_shot.get("holed",false) if mode==CLOSEST_TO_PIN else not players[player_index].done
 			state=replay_return_state; result_time=0
 	if (dragging or keyboard_charge) and state=="aim" and not help_open: swing_clock+=delta
 	if state=="result": result_time+=delta
@@ -828,6 +973,17 @@ func _update_camera(delta: float, instant: bool=false) -> void:
 	if camera.position.distance_to(target)>0.1: camera.look_at(target,Vector3.UP)
 
 func _input(event: InputEvent) -> void:
+	if parsec_setup_open:
+		if event is InputEventKey and event.pressed and event.keycode==KEY_ESCAPE: parsec_setup_open=false
+		return
+	if state=="calibration":
+		if event is InputEventKey and event.pressed and event.keycode==KEY_ESCAPE:
+			remote_timing_enabled=false; state="menu"; return
+		if event is InputEventKey and not event.pressed and event.keycode==KEY_SPACE:
+			record_calibration_sample(); return
+		if event is InputEventMouseButton and event.button_index==MOUSE_BUTTON_LEFT and not event.pressed:
+			record_calibration_sample(); return
+		return
 	if event is InputEventKey and event.pressed and not event.echo:
 		if state=="name_entry":
 			if event.keycode==KEY_ESCAPE: state="menu"
@@ -840,10 +996,13 @@ func _input(event: InputEvent) -> void:
 			if event.keycode in [KEY_ESCAPE,KEY_ENTER]: state="menu"
 			return
 		if state=="replay" and event.keycode in [KEY_ESCAPE,KEY_ENTER,KEY_SPACE]:
-			ball_pos=replay_end_position; ball.position=ball_pos; ball.visible=not players[player_index].done
+			ball_pos=replay_end_position; ball.position=ball_pos
+			ball.visible=not players[player_index].challenge_shot.get("holed",false) if mode==CLOSEST_TO_PIN else not players[player_index].done
 			state=replay_return_state; result_time=0; return
 		if event.keycode==KEY_H:
 			help_open=not help_open; dragging=false; keyboard_charge=false; return
+		if help_open and event.keycode!=KEY_ESCAPE: return
+		if event.keycode==KEY_B and state=="result": take_breakfast_ball(); return
 		if event.keycode==KEY_ESCAPE:
 			if help_open: help_open=false
 			elif state=="pause": state=previous_state
@@ -864,7 +1023,7 @@ func _input(event: InputEvent) -> void:
 			if event.keycode==KEY_A: path_offset=clampf(path_offset-0.15,-1,1)
 			if event.keycode==KEY_D: path_offset=clampf(path_offset+0.15,-1,1)
 	if event is InputEventKey and not event.pressed and event.keycode==KEY_SPACE and keyboard_charge:
-		shoot(maxf(charge,0.04),face_meter(),path_offset)
+		shoot(maxf(charge,0.04),evaluated_face_meter(),path_offset)
 	if help_open or state!="aim": return
 	if event is InputEventMouseButton:
 		if event.button_index==MOUSE_BUTTON_WHEEL_UP and event.pressed: change_club(-1)
@@ -876,7 +1035,7 @@ func _input(event: InputEvent) -> void:
 				aiming_drag=true; drag_current=event.position
 			elif not event.pressed:
 				if dragging:
-					var error: float=clampf(face_meter()+(event.position.x-drag_start.x)/150.0,-1,1)
+					var error: float=clampf(evaluated_face_meter()+(event.position.x-drag_start.x)/150.0,-1,1)
 					if pull>0.06: shoot(swing_power(),error,path_offset)
 					dragging=false
 				aiming_drag=false

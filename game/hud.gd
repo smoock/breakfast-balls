@@ -43,15 +43,17 @@ func button(r: Rect2,s: String,action: String,selected: bool=false,primary: bool
 func _draw() -> void:
 	if game==null: return
 	buttons.clear()
-	if game.state in ["menu","name_entry","leaderboard"]: _menu()
+	if game.state in ["menu","name_entry","leaderboard","calibration"]: _menu()
 	else: _game_hud()
 	if game.state=="name_entry": _name_entry()
+	if game.state=="calibration": _calibration()
 	if game.state=="leaderboard": _leaderboard()
 	if game.state=="replay": _replay_overlay()
 	if game.state=="result": _result()
 	if game.state in ["scorecard","finished"]: _scorecard()
 	if game.state=="pause": _pause()
 	if game.help_open: _help()
+	if game.parsec_setup_open: _parsec_setup()
 
 func _menu() -> void:
 	# A clubhouse scorecard laid over a moving course vista.
@@ -65,27 +67,40 @@ func _menu() -> void:
 	text(Vector2(38,273),"YOUR FOURSOME",12,GOLD,bold)
 	for i in range(4): button(Rect2(38+i*100,287,91,38),str(i+1)+(" player" if i==0 else " players"),"players:%d"%(i+1),game.player_count==i+1)
 	text(Vector2(38,357),"THE GAME",12,GOLD,bold)
-	button(Rect2(38,371,194,41),"Stroke Play","mode:0",game.mode==0)
-	button(Rect2(243,371,194,41),"Skins","mode:1",game.mode==1)
-	text(Vector2(38,435),"Lowest total wins." if game.mode==0 else "Win the hole. Ties carry the skin.",14,MUTED)
+	button(Rect2(38,371,126,41),"Stroke Play","mode:0",game.mode==0)
+	button(Rect2(173,371,126,41),"Skins","mode:1",game.mode==1)
+	button(Rect2(308,371,129,41),"Pin Challenge","mode:2",game.mode==2)
+	text(Vector2(38,435),"Closest to pin · One shot. Make it count." if game.mode==2 else "Lowest total wins." if game.mode==0 else "Win the hole. Ties carry the skin.",14,MUTED)
 	text(Vector2(38,470),"MAKE A MORNING OF IT",12,GOLD,bold)
-	for i in range(3):
-		var holes: int=[3,9,18][i]
-		button(Rect2(38+i*135,484,126,40),str(holes)+" holes","holes:%d"%holes,game.round_length==holes)
-	if game.round_length==9:
+	if game.mode==2:
+		panel(Rect2(38,484,399,44),Color("285046"),9)
+		center(Rect2(38,484,399,44),"3 PAR-3s  ·  HOLES 6 / 12 / 16",16,GOLD,bold)
+		text(Vector2(38,554),"1–4 players · Highest total wins · 300 max",13,MUTED)
+	else:
+		for i in range(3):
+			var holes: int=[3,9,18][i]
+			button(Rect2(38+i*135,484,126,40),str(holes)+" holes","holes:%d"%holes,game.round_length==holes)
+	if game.mode!=2 and game.round_length==9:
 		button(Rect2(38,535,194,28),"FRONT 9 · 1–9","nine:0",game.nine_side==0)
 		button(Rect2(243,535,194,28),"BACK 9 · 10–18","nine:1",game.nine_side==1)
-	else: text(Vector2(38,554),"3 random holes · A fresh trio every round" if game.round_length==3 else "The full course · All 18 holes",13,MUTED)
+	elif game.mode!=2: text(Vector2(38,554),"3 random holes · A fresh trio every round" if game.round_length==3 else "The full course · All 18 holes",13,MUTED)
 	button(Rect2(38,574,399,60),"LET'S PLAY GOLF    →","play",false,true)
 	button(Rect2(38,649,126,40),"How to swing","help")
 	button(Rect2(174,649,126,40),"Leaderboard","leaderboard")
 	button(Rect2(310,649,127,40),"Sound: "+("on" if game.sound_enabled else "off"),"sound")
-	text(Vector2(38,745),"LOCAL PLAY  /  MOUSE + TRACKPAD",12,GOLD,bold)
-	text(Vector2(38,770),"No accounts. No connection. Just golf.",13,MUTED)
+	button(Rect2(38,699,194,35),"TIMING: "+("ON" if game.remote_timing_enabled else "OFF"),"remote",game.remote_timing_enabled)
+	button(Rect2(243,699,194,35),"PARSEC REMOTE PLAY","parsec",false,true)
+	text(Vector2(38,758),game.parsec_status,12,GOLD,bold)
+	text(Vector2(38,782),"Give guests keyboard + mouse permission.",13,MUTED)
 	panel(Rect2(502,25,745,56),Color(0.06,0.19,0.15,0.84),12)
 	text(Vector2(522,48),"MAGNOLIA PINES",17,CREAM,bold)
 	text(Vector2(522,68),"18 original holes · Augusta-inspired southern golf",12,Color("d4e0bf"))
 	center(Rect2(1125,29,103,44),"PAR 72",16,GOLD,bold)
+	panel(Rect2(504,111,740,149),Color(0.065,0.19,0.15,0.92),16)
+	text(Vector2(526,142),"DINER SPECIAL · CLOSEST TO PIN" if game.mode==2 else "FIRST TEE SPECIAL · THE BREAKFAST BALL",13,GOLD,bold)
+	text(Vector2(526,176),"Three pins. Three swings. Bragging rights." if game.mode==2 else "Bad opening shot? Order a fresh start.",23,CREAM,serif)
+	text(Vector2(526,204),"Hole out for 100 points; otherwise lose 1 per foot, rounded up." if game.mode==2 else "Each golfer may replay their opening tee shot once. Press B at the result.",14,MUTED)
+	text(Vector2(526,228),"Missed green: 0. Same wind for everyone. No Breakfast Balls." if game.mode==2 else "Using it clears the shot + penalty and makes your round ineligible for records.",14,MUTED)
 	panel(Rect2(504,294,740,479),Color(0.065,0.19,0.15,0.94),16)
 	text(Vector2(526,326),"PICK YOUR ALTER EGO",13,GOLD,bold)
 	for i in range(game.player_count):
@@ -119,6 +134,47 @@ func _name_entry() -> void:
 	center(Rect2(390,457,500,25),"Letters only · Backspace edits · Enter confirms",13,Color("647454"))
 	button(Rect2(493,511,294,46),"CONTINUE    ↵","confirmname",false,game.name_entry_value.length()==5)
 	text(Vector2(372,585),"ESC  Return to clubhouse",12,Color("647454"))
+
+func _calibration() -> void:
+	buttons.clear()
+	draw_rect(Rect2(0,0,1280,800),Color(0.02,0.08,0.05,0.78))
+	panel(Rect2(300,145,680,510),CREAM,18)
+	center(Rect2(335,181,610,30),"REMOTE TIMING CHECK",12,Color("647454"),bold)
+	center(Rect2(335,222,610,48),"Hand the controls to %s."%game.player_tags[game.calibration_player],30,INK,serif)
+	center(Rect2(350,283,580,24),"Click or release SPACE when the needle reaches the center.",14,Color("647454"))
+	center(Rect2(350,313,580,22),"Three passes estimate the guest's end-to-end delay.",12,Color("647454"))
+	var meter:=Rect2(390,390,500,54)
+	panel(meter,Color("d9c98f"),9)
+	draw_rect(Rect2(631,390,18,54),Color("7c9951"))
+	draw_line(Vector2(640,382),Vector2(640,452),INK,2,true)
+	var needle_x: float=640.0+game.calibration_meter()*270.0
+	draw_line(Vector2(needle_x,380),Vector2(needle_x,454),INK,4,true)
+	center(Rect2(390,470,500,30),"PASS %d OF 3"%[game.calibration_samples.size()+1],13,INK,bold)
+	for i in range(3):
+		draw_circle(Vector2(610+i*30,526),8,GOLD if i<game.calibration_samples.size() else Color("c7c3ae"))
+	center(Rect2(390,557,500,24),"Player 1 hosts and needs no correction.",12,Color("647454"))
+	text(Vector2(335,622),"ESC  Disable remote timing and return to clubhouse",12,Color("647454"))
+
+func _parsec_setup() -> void:
+	buttons.clear()
+	draw_rect(Rect2(0,0,1280,800),Color(0.02,0.08,0.05,0.80))
+	panel(Rect2(300,120,680,560),CREAM,18)
+	center(Rect2(335,156,610,30),"PARSEC REMOTE PLAY",12,Color("647454"),bold)
+	center(Rect2(335,197,610,48),"Invite the foursome—no green fees.",29,INK,serif)
+	var steps: Array=[
+		["01", "Open Parsec and enable Hosting on this computer."],
+		["02", "Choose Share in Parsec and send the link to your guests."],
+		["03", "Accept each guest, then grant keyboard and mouse access."],
+		["04", "Return here, choose the player count, and enable Timing."]
+	]
+	for i in range(steps.size()):
+		var y: float=286+i*67
+		draw_circle(Vector2(365,y-5),20,GOLD)
+		center(Rect2(345,y-25,40,40),steps[i][0],12,INK,bold)
+		text(Vector2(402,y),steps[i][1],14,Color("65735c"))
+	button(Rect2(390,570,238,46),"OPEN PARSEC","openparsec",false,true)
+	button(Rect2(652,570,238,46),"BACK TO CLUBHOUSE","closeparsec")
+	center(Rect2(350,634,580,20),"Guests share the active player's mouse or Space-bar swing.",12,Color("647454"))
 
 func _record_line(y: float,label: String,key: String,suffix: String) -> void:
 	var record: Dictionary=game.leaderboard[key]
@@ -212,8 +268,8 @@ func _game_hud() -> void:
 	text(Vector2(295,79),h[0],19,CREAM,bold)
 	text(Vector2(505,53),"PAR %d"%h[1],17,CREAM,bold)
 	text(Vector2(505,77),"%d YARDS"%h[2],12,MUTED)
-	text(Vector2(629,53),"STROKE PLAY" if game.mode==0 else "SKINS · POT %d"%game.skin_pot,14,GOLD,bold)
-	text(Vector2(629,78),"%d PLAYER%s · LOCAL"%[game.player_count,"" if game.player_count==1 else "S"],12,MUTED)
+	text(Vector2(629,53),"CLOSEST TO PIN" if game.mode==2 else "STROKE PLAY" if game.mode==0 else "SKINS · POT %d"%game.skin_pot,14,GOLD,bold)
+	text(Vector2(629,78),"%d PLAYER%s · %s"%[game.player_count,"" if game.player_count==1 else "S","REMOTE TIMING" if game.remote_timing_enabled else "LOCAL"],12,MUTED)
 	button(Rect2(866,40,105,39),"Card","card")
 	button(Rect2(981,40,105,39),"Flyover","overview",game.overview)
 	button(Rect2(1096,40,62,39),"?","help")
@@ -225,6 +281,16 @@ func _game_hud() -> void:
 	text(Vector2(91,146),"P%d · %s · %s"%[game.player_index+1,p.tag,game.relative_score(game.player_index)],12,GOLD,bold)
 	text(Vector2(91,171),Data.GOLFERS[p.golfer][0],19,CREAM,bold)
 	text(Vector2(91,192),"SHOT %d  /  %s"%[p.strokes+1 if game.state=="aim" else p.strokes,game.course.lie_at(game.ball_pos)],12,MUTED)
+	if p.breakfast_used:
+		panel(Rect2(24,290,222,29),INK,8)
+		center(Rect2(24,290,222,29),"BREAKFAST BALL USED",11,GOLD,bold)
+	if game.mode==2:
+		panel(Rect2(354,111,522,45),INK,10)
+		center(Rect2(354,111,522,45),"ONE SHOT EACH · FINISH ON THE GREEN · 100 PTS MAX",12,GOLD,bold)
+	if game.breakfast_flash>0 and game.state=="aim":
+		panel(Rect2(370,300,540,94),INK,16,GOLD)
+		center(Rect2(385,309,510,38),"FRESH EGG. FRESH START.",25,CREAM,serif)
+		center(Rect2(385,353,510,27),"Breakfast Ball served · Your next shot counts",14,GOLD,bold)
 	# Wind compass.
 	panel(Rect2(24,220,174,61),Color(0.07,0.20,0.15,0.88),12)
 	var wind_angle: float=atan2(game.wind.x,-game.wind.y)-game.aim
@@ -429,9 +495,15 @@ func _result() -> void:
 	center(Rect2(363,350,554,43),game.result_title,22,CREAM,bold)
 	center(Rect2(365,399,550,30),game.result_detail,13,MUTED)
 	if game.record_notice!="": center(Rect2(365,425,550,22),game.record_notice,11,GOLD,bold)
-	button(Rect2(493,449,294,43),"CONTINUE    ↵","continue",false,true)
+	if game.can_take_breakfast_ball():
+		button(Rect2(374,449,233,43),"PLAY IT    ↵","continue",false,true)
+		button(Rect2(619,449,287,43),"BREAKFAST BALL    B","breakfast")
+	else: button(Rect2(493,449,294,43),"CONTINUE    ↵","continue",false,true)
 
 func _scorecard() -> void:
+	if game.mode==2:
+		_challenge_scorecard()
+		return
 	buttons.clear()
 	draw_rect(Rect2(0,0,1280,800),Color(0.02,0.08,0.05,0.64))
 	panel(Rect2(95,148,1090,517),CREAM,18)
@@ -449,7 +521,7 @@ func _scorecard() -> void:
 	for pi in range(game.players.size()):
 		var y: float=349+pi*43
 		if pi%2==0: panel(Rect2(122,y-1,1038,40),Color("e8e5cf"),4)
-		text(Vector2(139,y+25),"%s  ·  %s"%[game.players[pi].tag,Data.GOLFERS[game.players[pi].golfer][0]],14,INK,bold)
+		text(Vector2(139,y+25),"%s · %s%s"%[game.players[pi].tag,Data.GOLFERS[game.players[pi].golfer][0].split(" ")[0]," *" if game.players[pi].breakfast_used else ""],14,INK,bold)
 		for i in range(game.round_holes.size()):
 			var value: String="—"
 			var c: Color=Color("a3ab94")
@@ -462,11 +534,43 @@ func _scorecard() -> void:
 		if game.mode==1: text(Vector2(145,y+38),"%d skins"%game.players[pi].skins,9,Color("647454"))
 	var msg: String=game.winners_text() if game.state=="finished" else game.hole_message if game.hole_done else "Round in progress · Lowest total wins." if game.mode==0 else "Unique low score wins the pot. Ties carry forward."
 	text(Vector2(133,558),msg,16,INK,bold)
+	if game.players.any(func(p): return p.breakfast_used): text(Vector2(133,625),"* Breakfast Ball used · Round excluded from club records",12,Color("647454"))
 	if game.state=="finished":
 		text(Vector2(133,586),"Same time next Sunday?",14,Color("647454"))
 		button(Rect2(844,593,304,44),"BACK TO THE CLUBHOUSE","menu",false,true)
 	else:
 		button(Rect2(844,593,304,44),"FINAL RESULTS  →" if game.hole_done and game.round_position+1>=game.round_length else "NEXT TEE  →" if game.hole_done else "BACK TO PLAY","next",false,true)
+
+func _challenge_scorecard() -> void:
+	buttons.clear()
+	draw_rect(Rect2(0,0,1280,800),Color(0.02,0.08,0.05,0.64))
+	panel(Rect2(95,148,1090,517),CREAM,18)
+	text(Vector2(130,191),"DINER SPECIAL · FINAL RESULTS" if game.state=="finished" else "DINER SPECIAL · THE SCORECARD",12,Color("647454"),bold)
+	text(Vector2(130,237),"Closest to pin.",38,INK,serif)
+	text(Vector2(130,267),"100 points minus feet from the cup (rounded up) · Missed green: 0",14,Color("647454"))
+	panel(Rect2(122,285,1038,38),INK,5)
+	text(Vector2(139,310),"GOLFER",12,CREAM,bold)
+	for i in range(3): center(Rect2(477+i*170,285,160,38),"HOLE %d"%(game.round_holes[i]+1),13,CREAM,bold)
+	center(Rect2(1003,285,145,38),"TOTAL / 300",12,GOLD,bold)
+	for pi in range(game.players.size()):
+		var p: Dictionary=game.players[pi]
+		var y: float=336+pi*47
+		if pi%2==0: panel(Rect2(122,y,1038,44),Color("e8e5cf"),4)
+		text(Vector2(139,y+27),"%s · %s"%[p.tag,Data.GOLFERS[p.golfer][0]],14,INK,bold)
+		for i in range(3):
+			var label: String="—"
+			if i<p.challenge_results.size():
+				var shot: Dictionary=p.challenge_results[i]
+				label="ACE · 100 pts" if shot.holed else "%.1f ft · %d pts"%[shot.feet,shot.points] if shot.valid else "MISS · 0 pts"
+			center(Rect2(477+i*170,y,160,44),label,13,INK)
+		center(Rect2(1003,y,145,44),str(game.total_score(pi)),19,INK,bold)
+	var message: String=game.winners_text() if game.state=="finished" else game.hole_message if game.hole_done else "One shot per golfer. Highest three-hole total wins."
+	text(Vector2(133,553),message,16,INK,bold)
+	if game.state=="finished":
+		button(Rect2(133,593,284,44),"ANOTHER SERVING","retrychallenge",false,true)
+		button(Rect2(844,593,304,44),"BACK TO THE CLUBHOUSE","menu")
+	else:
+		button(Rect2(844,593,304,44),"FINAL RESULTS  →" if game.hole_done and game.round_position==2 else "NEXT PIN  →" if game.hole_done else "BACK TO PLAY","next",false,true)
 
 func _pause() -> void:
 	buttons.clear()
@@ -510,7 +614,7 @@ func _action(action: String) -> void:
 	var parts: PackedStringArray=action.split(":")
 	var value: int=int(parts[1]) if parts.size()>1 else 0
 	match parts[0]:
-		"players": game.player_count=value; game.active_slot=mini(game.active_slot,value-1); game.mode=0 if value==1 else game.mode
+		"players": game.player_count=value; game.active_slot=mini(game.active_slot,value-1); game.mode=0 if value==1 and game.mode==1 else game.mode
 		"mode": game.mode=value; game.player_count=maxi(2,game.player_count) if value==1 else game.player_count
 		"holes": game.round_length=value
 		"nine": game.nine_side=value
@@ -523,6 +627,10 @@ func _action(action: String) -> void:
 		"help": game.help_open=true; game.dragging=false; game.keyboard_charge=false
 		"closehelp": game.help_open=false
 		"sound": game.toggle_sound()
+		"remote": game.remote_timing_enabled=not game.remote_timing_enabled
+		"parsec": game.parsec_setup_open=true
+		"openparsec": game.open_parsec()
+		"closeparsec": game.parsec_setup_open=false
 		"club": game.change_club(value)
 		"selectclub":
 			if game.state=="aim" and not game.dragging: game.club=value; game._update_marker()
@@ -531,6 +639,9 @@ func _action(action: String) -> void:
 		"overview":
 			if game.state=="aim": game.overview=not game.overview
 		"continue": game.advance_turn()
+		"breakfast": game.take_breakfast_ball()
+		"retrychallenge":
+			if game.state=="finished" and game.mode==2: game.start_round()
 		"card":
 			if game.state=="aim": game.score_return="aim"; game.state="scorecard"
 		"next": game.next_hole()

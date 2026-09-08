@@ -34,6 +34,25 @@ func run() -> void:
 	check(Data.skin_winner([4,4,5])==-1,"low tie carries skin")
 	check(Data.skin_winner([4,4,3])==2,"later unique lower score beats earlier tie")
 	game=Main.new(); root.add_child(game); game.sound_enabled=false; game.records_enabled=false
+	# Remote timing keeps the original meter but evaluates the state the guest saw.
+	game.remote_timing_enabled=true; game.player_count=2; game.round_length=3
+	game.begin_calibration()
+	for sample_clock in [0.90,0.88,0.89]:
+		game.calibration_clock=sample_clock; game.record_calibration_sample()
+	check(game.state=="aim","three calibration passes start the round")
+	check(is_equal_approx(game.timing_offsets[1],0.09),"median guest timing offset rejects sample order")
+	game.player_index=1
+	for delay in [0.0,0.08,0.15,0.25]:
+		game.timing_offsets[1]=delay; game.swing_clock=0.42+delay
+		var expected: float=sin(0.42*5.6*game.contact_difficulty())*0.85
+		check(is_equal_approx(game.evaluated_face_meter(),expected),"timing compensation matches local result at %d ms"%roundi(delay*1000))
+	game.player_index=0; game.timing_offsets[0]=0.25; game.swing_clock=0.42
+	check(is_equal_approx(game.evaluated_face_meter(),game.face_meter()),"host timing is never offset")
+	game.remote_timing_enabled=false
+	game.parsec_setup_open=true
+	var parsec_escape:=InputEventKey.new(); parsec_escape.keycode=KEY_ESCAPE; parsec_escape.pressed=true
+	game._input(parsec_escape)
+	check(not game.parsec_setup_open,"Escape closes the Parsec setup card")
 	game.player_count=4; game.round_length=3; game.mode=0; start_test_round()
 	check(game.players.size()==4,"four local golfers")
 	game.wind=Vector2.ZERO

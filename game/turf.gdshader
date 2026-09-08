@@ -8,10 +8,26 @@ uniform bool par_five = false;
 uniform int cut_kind = 4;
 uniform float route_x[5];
 uniform float route_width[5];
+uniform int bunker_count = 0;
+uniform vec4 bunker_ellipses[8];
+uniform int pond_count = 0;
+uniform vec4 pond_ellipses[24];
 varying vec3 world_pos;
 float hash(vec2 p) { return fract(sin(dot(p,vec2(127.1,311.7)))*43758.5453); }
+bool inside_ellipse(vec2 p,vec4 e) {
+ vec2 q=(p-e.xy)/e.zw;
+ return dot(q,q)<0.995;
+}
 void vertex() { world_pos=(MODEL_MATRIX*vec4(VERTEX,1.0)).xyz; }
 void fragment() {
+ for(int h=0;h<8;h++) {
+  if(h>=bunker_count) break;
+  if(inside_ellipse(world_pos.xz,bunker_ellipses[h])) discard;
+ }
+ for(int h=0;h<24;h++) {
+  if(h>=pond_count) break;
+  if(inside_ellipse(world_pos.xz,pond_ellipses[h])) discard;
+ }
  vec3 base=use_vertex_color ? COLOR.rgb : turf_color.rgb;
  int cut=cut_kind;
  if (use_vertex_color) {
