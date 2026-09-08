@@ -54,7 +54,9 @@ def add_branch(name, start, end, radius, mat, vertices=8):
     start = Vector((start[0], -start[2], start[1]))
     end = Vector((end[0], -end[2], end[1]))
     axis = end - start
-    obj = add_cone(name, (start + end) * 0.5, radius * 1.18, radius * 0.62, axis.length, mat, vertices)
+    midpoint = (start + end) * 0.5
+    # add_cone accepts Godot Y-up, while start/end above are already Blender Z-up.
+    obj = add_cone(name, (midpoint.x, midpoint.z, -midpoint.y), radius * 1.18, radius * 0.62, axis.length, mat, vertices)
     obj.rotation_mode = "QUATERNION"
     obj.rotation_quaternion = Vector((0, 0, 1)).rotation_difference(axis.normalized())
     return obj
@@ -70,10 +72,15 @@ def apply_and_join(objects, name):
     bpy.context.view_layer.objects.active = objects[0]
     bpy.ops.object.join()
     objects[0].name = name
+    # Center exported mesh vertices at the trunk foot, not the active primitive.
+    bpy.context.scene.cursor.location = (0, 0, 0)
+    bpy.ops.object.origin_set(type='ORIGIN_CURSOR')
     decimate = objects[0].modifiers.new(name="Game silhouette decimation", type="DECIMATE")
     decimate.ratio = 0.45
     bpy.context.view_layer.objects.active = objects[0]
     bpy.ops.object.modifier_apply(modifier=decimate.name)
+    objects[0].data.validate(clean_customdata=False)
+    objects[0].data.update()
     return objects[0]
 
 
@@ -117,6 +124,7 @@ def build_pine():
     parts.append(add_ico("pine_top", (0, 15.0, 0), (1.05, 1.75, 1.05), needle_light, 2))
     tree = apply_and_join(parts, "Tree_Pine_A")
     export_selected(tree, "tree_pine_a.glb")
+    bpy.ops.wm.save_as_mainfile(filepath=str(SOURCE_DIR / "pine_tree.blend"))
 
 
 def build_broadleaf():

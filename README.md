@@ -61,6 +61,14 @@ Magnolia Pines is an original, stylized course inspired by Augusta's pine corrid
 
 ## Development and verification
 
+### Continuous-surface visual revision
+
+The course now uses one continuous, smoothly shaded terrain mesh for turf, greens, recessed sand bowls and water. A shared material classifies those surfaces from the same hazard data used by ball physics, eliminating grass triangles, overlapping rims and fragmented shorelines. Fine sand/turf detail is distance-filtered. Hole 13 has a continuous creek channel; Hole 16's lake-side bunker has been moved slightly inland to preserve a grass bank. The yardage book follows the same hazard priority and creek path.
+
+Blender-authored shirt, pelvis and shoes replace the golfer's blockier body forms. The procedural swing now articulates hips, weight transfer, knees, a planted lead foot, trailing heel, constrained arms and target-facing follow-through. The buckle moves with the pelvis. Club length and the existing 0.85-second impact timing are preserved. This remains an expressive cartoon golfer, not a photorealistic or motion-captured character. Corrected Blender tree origins and branch transforms remove detached branches.
+
+Repeatable review: `godot --path . --script tests/course_visual_audit.gd -- --output=/private/tmp/breakfast-audit`, then `python3 tools/audit_contact_sheets.py /private/tmp/breakfast-audit` (Pillow required). It captures all 18 holes, all 44 bunkers from overhead and low angles, water, player views, and a simulated swing sequence. `--holes=13,16` or `--motion-only` narrows a rerun. Retained results are in `screenshots/course-review/`. Run `tests/course_surface_tests.gd` headlessly for surface continuity, creek connectivity, every-hole tee shots, limb reach, foot contact and impact alignment. `tests/course_performance.gd` measures three fixed hardware-rendered views after warmup; headless simulation tests are not graphics benchmarks.
+
 ### Swing and feedback revision 4
 
 The [user-supplied swing GIF](https://i.imgur.com/A72Bu.gif) was inspected at address, takeaway and the top of the swing. The procedural rig now uses a forward hip hinge, shoulder turn, staged hand positions, wrist hinge and constant shaft length instead of a single pendulum rotation. This is a stylized keyframed approximation, not motion capture. Swing-stage badges are removed. Eight distinct vector portraits replace the old recolored faces. Per-category commentary cycles without consecutive repetition, distinguishing short/long putts, holed shots, approaches, drives, fairway, rough, sand and penalties.

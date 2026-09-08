@@ -7,6 +7,7 @@ const BUILD=[0.94,1.06,0.98,0.96,1.18,1.04,0.90,0.94]
 static func face(course: Node3D,parent: Node3D,id: int) -> void:
 	var skin:=Color(SKIN[id]); var hair:=Color(HAIR[id])
 	var root:=Node3D.new(); root.position=Vector3(0,0.94,-0.20); parent.add_child(root)
+	root.name="HeadPivot"
 	var head=course.sphere(Vector3.ZERO,0.20,skin,root)
 	head.scale=Vector3(0.92 if id in [1,4] else 0.80,1.16 if id in [0,7] else 1.08,0.87)
 	var jaw=course.sphere(Vector3(0,-0.105,-0.035),0.13,skin,root); jaw.scale=Vector3(0.95,0.70,0.95)
@@ -42,5 +43,3 @@ static func tailoring(course: Node3D,parent: Node3D,color: Color) -> void:
 		var collar=course.sphere(Vector3(side*0.075,0.66,-0.20),0.09,color.lightened(0.14),parent)
 		collar.scale=Vector3(0.65,0.45,0.30); collar.rotation.z=side*0.5
 	for y in [0.53,0.58,0.63]: course.sphere(Vector3(0,y,-0.265),0.013,Color("f1e7d2"),parent)
-	var buckle:=BoxMesh.new(); buckle.size=Vector3(0.08,0.055,0.025)
-	course.mesh_node(buckle,course.material(Color("b8b7a3"),0.3),Vector3(0,0.015,-0.27),parent)

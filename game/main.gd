@@ -326,22 +326,29 @@ func _build_golfer() -> void:
 	var c:=Color(Data.GOLFERS[identity][2])
 	# Tailored proportions, articulated limbs and a forward address stance.
 	var pants:=Color("496478"); var skin:=Color(Character.SKIN[identity])
-	var pelvis=course.body_prism(Vector3(0,1.08,0.035),0.34,Vector2(0.24,0.16),Vector2(0.29,0.18),pants,golfer)
+	var pelvis=course.mesh_node(course._mesh_from_scene("res://game/assets/models/golfer_pelvis.glb"),course.material(pants),Vector3(0,1.08,0.035),golfer)
+	pelvis.name="Pelvis"
 	pelvis.scale.x*=Character.BUILD[identity]
 	for side in [-1,1]:
 		var hip:=Vector3(side*0.17,1.15,0.04)
 		var knee:=Vector3(side*0.23,0.64,-0.10)
 		var ankle:=Vector3(side*0.29,0.16,0.02)
-		_limb(hip,knee,0.14,0.115,pants,golfer)
-		_limb(knee,ankle,0.115,0.075,pants,golfer)
+		var thigh=_limb(hip,knee,0.14,0.115,pants,golfer); thigh.name="Thigh%d"%side
+		var shin=_limb(knee,ankle,0.115,0.075,pants,golfer); shin.name="Shin%d"%side
 		var knee_joint=course.sphere(knee,0.12,pants.darkened(0.035),golfer)
+		knee_joint.name="Knee%d"%side
 		knee_joint.scale=Vector3(0.92,0.78,0.92)
-		var shoe=course.sphere(ankle+Vector3(0,-0.04,-0.10),0.16,Color("f4eddc"),golfer); shoe.scale=Vector3(0.65,0.50,1.6)
-		var sole=course.sphere(ankle+Vector3(0,-0.09,-0.10),0.16,Color("243c45"),golfer); sole.scale=Vector3(0.68,0.16,1.65)
+		var shoe=course.mesh_node(course._mesh_from_scene("res://game/assets/models/golfer_shoe.glb"),course.material(Color("f4eddc")),ankle+Vector3(0,-0.04,-0.10),golfer)
+		shoe.name="Shoe%d"%side
+		var sole=course.mesh_node(shoe.mesh,course.material(Color("243c45")),ankle+Vector3(0,-0.10,-0.10),golfer)
+		sole.scale=Vector3(1.015,0.20,1.015); sole.name="Sole%d"%side
 	var torso:=Node3D.new(); torso.name="SwingTorso"; torso.position=Vector3(0,1.12,0); golfer.add_child(torso)
-	var shirt=course.body_prism(Vector3(0,0.36,-0.08),0.76,Vector2(0.23,0.18),Vector2(0.34,0.215),c,torso); shirt.rotation.x=-0.16
+	var shirt=course.mesh_node(course._mesh_from_scene("res://game/assets/models/golfer_polo.glb"),course.material(c),Vector3(0,0.36,-0.08),torso); shirt.rotation.x=-0.16
 	shirt.scale.x*=Character.BUILD[identity]
-	course.cylinder(Vector3(0,0.015,0),0.275,0.065,Color("24343e"),-1,torso)
+	var belt=course.cylinder(Vector3(0,0.10,0),0.255,0.055,Color("24343e"),-1,pelvis)
+	belt.scale.z=0.70
+	var buckle:=BoxMesh.new(); buckle.size=Vector3(0.08,0.055,0.025)
+	course.mesh_node(buckle,course.material(Color("b8b7a3"),0.3),Vector3(0,0.10,-0.18),pelvis)
 	var neck=course.cylinder(Vector3(0,0.77,-0.16),0.085,0.19,skin,0.072,torso)
 	neck.rotation.x=-0.10
 	# Shoulder caps make the arms read as attached anatomy at gameplay distance.
@@ -368,38 +375,86 @@ func _place_limb(n: MeshInstance3D,a: Vector3,b: Vector3) -> void:
 	n.position=(a+b)*0.5
 	n.mesh.height=a.distance_to(b)
 	var axis: Vector3=(b-a).normalized()
-	var tangent: Vector3=Vector3.FORWARD.cross(axis).normalized()
+	var pole: Vector3=Vector3.FORWARD if absf(axis.z)<0.95 else Vector3.RIGHT
+	var tangent: Vector3=pole.cross(axis).normalized()
 	n.basis=Basis(tangent,axis,tangent.cross(axis).normalized())
 
 func _pose_swing(angle: float) -> void:
 	if swing_parts.size()!=8: return
 	var phase: float=clampf(absf(angle)/2.25,0,1)
 	var back: bool=angle<0
+	var finish: float=0.0 if back else smoothstep(0.0,1.0,phase)
+	var coil: float=phase if back else 0.0
+	var shift:=Vector3(0.055*coil-0.12*finish,0.015*coil+0.055*finish,0.0)
+	var hip_turn: float=-0.34*coil+0.78*finish
+	var pelvis: Node3D=golfer.get_node("Pelvis")
+	pelvis.position=Vector3(0,1.08,0.035)+shift
+	pelvis.rotation.y=hip_turn
 	var torso: Node3D=golfer.get_node("SwingTorso")
-	# Positive follow-through rotation opens the chest/head down the target line.
-	# The previous sign turned the character back toward the camera.
-	torso.rotation=Vector3(lerpf(-0.32,-0.10,phase if not back else phase*0.2),phase*(-0.75 if back else 1.0),0)
+	torso.position=Vector3(0,1.12,0)+shift
+	torso.rotation=Vector3(-0.32+0.25*finish,-0.90*coil+1.15*finish,0.04*coil-0.06*finish)
+	# Hold the eyes on the ball through impact, then track it down the target line.
+	var face: Node3D=torso.get_node("HeadPivot")
+	face.rotation=Vector3(0.10*coil,-torso.rotation.y*(0.85 if back else 0.0)+0.35*finish,0.0)
+	for side in [-1,1]:
+		var trail: bool=side==1
+		var heel: float=0.22*sin(0.62*finish) if trail else 0.0
+		var hip: Vector3=Vector3(side*0.17,1.15,0.04)+shift
+		hip=pelvis.position+Basis(Vector3.UP,hip_turn)*(hip-pelvis.position)
+		var foot_world: Vector3=golfer.to_global(Vector3(side*0.29,0,0.02))
+		var ground_y: float=golfer.to_local(course.ground_point(foot_world.x,foot_world.z)).y
+		var ankle:=Vector3(side*0.29,ground_y+0.115+heel,0.02)
+		var knee:=Vector3(side*0.23-0.10*finish,0.64+0.07*finish,-0.10-0.07*coil)
+		if trail: knee.x-=0.10*finish; knee.z-=0.08*finish
+		_place_limb(golfer.get_node("Thigh%d"%side),hip,knee)
+		_place_limb(golfer.get_node("Shin%d"%side),knee,ankle)
+		golfer.get_node("Knee%d"%side).position=knee
+		var shoe: Node3D=golfer.get_node("Shoe%d"%side)
+		shoe.position=ankle+Vector3(0,-0.04,-0.10)
+		shoe.rotation=Vector3(-0.62*finish if trail else 0.0,0.28*finish if trail else 0.10*finish,0.0)
+		var sole: Node3D=golfer.get_node("Sole%d"%side)
+		sole.position=shoe.position+shoe.basis*Vector3(0,-0.06,0)
+		sole.rotation=shoe.rotation
 	var grip:=Vector3(0,1.00,-0.42)
 	var club_dir:=Vector3(0.10,-0.90,-0.66).normalized()
 	if back:
 		if phase<0.48:
-			grip=grip.lerp(Vector3(0.48,1.25,-0.35),phase/0.48)
-			club_dir=club_dir.slerp(Vector3(1,0.1,0).normalized(),phase/0.48)
+			var t: float=smoothstep(0,0.48,phase)
+			grip=grip.lerp(Vector3(0.46,1.27,-0.40),t)
+			club_dir=club_dir.slerp(Vector3(1.0,0.10,-0.15).normalized(),t)
 		else:
-			grip=Vector3(0.48,1.25,-0.35).lerp(Vector3(0.48,1.95,0.04),(phase-0.48)/0.52)
-			club_dir=Vector3(1,0.1,0).normalized().slerp(Vector3(-0.8,0.1,0.5).normalized(),(phase-0.48)/0.52)
-	else:
-		grip=grip.lerp(Vector3(-0.45,2.0,0.05),phase)
-		club_dir=club_dir.slerp(Vector3(0.95,-0.1,0.2).normalized(),phase)
+			var t: float=smoothstep(0.48,1.0,phase)
+			grip=Vector3(0.46,1.27,-0.40).lerp(Vector3(0.48,2.02,0.02),t)
+			club_dir=Vector3(1.0,0.10,-0.15).normalized().slerp(Vector3(-0.92,0.15,0.35).normalized(),t)
+	elif phase>0:
+		if phase<0.50:
+			var t: float=smoothstep(0,0.50,phase)
+			grip=grip.lerp(Vector3(-0.52,1.45,-0.42),t)
+			club_dir=club_dir.slerp(Vector3(-0.95,0.18,-0.15).normalized(),t)
+		else:
+			var t: float=smoothstep(0.50,1.0,phase)
+			grip=Vector3(-0.52,1.45,-0.42).lerp(Vector3(-0.32,2.00,0.15),t)
+			club_dir=Vector3(-0.95,0.18,-0.15).normalized().slerp(Vector3(0.65,0.65,0.40).normalized(),t)
+	# Both hands share a grip; constrain it to the intersection of arm reach spheres.
+	if phase>0.001:
+		for iteration in range(3):
+			for side in [-1,1]:
+				var shoulder: Vector3=torso.transform*Vector3(side*0.28,0.60,-0.06)
+				var delta: Vector3=grip-shoulder
+				if delta.length()>0.80: grip=shoulder+delta.normalized()*0.80
 	var inv: Transform3D=torso.transform.affine_inverse()
 	for i in range(2):
 		var side: float=-1.0 if i==0 else 1.0
 		var shoulder:=Vector3(side*0.28,0.60,-0.06)
-		var hand: Vector3=inv*(grip+Vector3(side*0.025,side*0.025,0))
-		var axis: Vector3=(hand-shoulder).normalized()
-		var pole: Vector3=Vector3(side,0,0.65)
+		var hand: Vector3=inv*(grip+club_dir*side*0.027)
+		var delta: Vector3=hand-shoulder
+		var distance: float=maxf(0.001,delta.length())
+		var axis: Vector3=delta/distance
+		var pole:=Vector3(side*0.75,-0.10,0.60)
 		var bend_dir: Vector3=(pole-axis*pole.dot(axis)).normalized()
-		var elbow: Vector3=(shoulder+hand)*0.5+bend_dir*sqrt(maxf(0.002,0.40*0.40-shoulder.distance_squared_to(hand)*0.25))
+		var upper: float=0.43; var forearm: float=0.40
+		var along: float=(upper*upper-forearm*forearm+distance*distance)/(2.0*distance)
+		var elbow: Vector3=shoulder+axis*along+bend_dir*sqrt(maxf(0.0001,upper*upper-along*along))
 		_place_limb(swing_parts[i*3],shoulder,elbow)
 		_place_limb(swing_parts[i*3+1],elbow,hand)
 		swing_parts[i*3+2].position=hand

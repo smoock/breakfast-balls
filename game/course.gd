@@ -19,6 +19,17 @@ var bunkers: Array = []
 var trees: Array = []
 var rng := RandomNumberGenerator.new()
 var terrain_mesh: MeshInstance3D
+var pond_levels: Array=[]
+var authored_mesh_cache: Dictionary={}
+var creek_points: PackedVector2Array=[]
+
+func creek_distance(p: Vector2) -> float:
+	var distance: float=10000.0
+	for i in range(1,creek_points.size()):
+		var a: Vector2=creek_points[i-1]; var ab: Vector2=creek_points[i]-a
+		var t: float=clampf((p-a).dot(ab)/ab.length_squared(),0,1)
+		distance=minf(distance,p.distance_to(a+ab*t)-4.5)
+	return distance
 
 func center_x(z: float) -> float:
 	return profile(Layouts.HOLES[hole_index].x,-z/length_m)
@@ -36,11 +47,24 @@ func height_at(x: float, z: float) -> float:
 	var height: float=base_height_at(x,z)
 	# Bunkers are true terrain bowls. The broad flat floor and steeper outer third
 	# produce a visible face/lip while keeping ball physics on the same surface.
+	var depression: float=0.0
 	for e in bunkers:
 		var q: float=sqrt(pow((x-e.x)/e.z,2.0)+pow((z-e.y)/e.w,2.0))
 		if q<1.0:
 			var bowl: float=1.0-smoothstep(0.48,1.0,q)
-			height-=1.15*bowl
+			depression=maxf(depression,1.15*bowl)
+	height-=depression
+	if not creek_points.is_empty():
+		var distance: float=creek_distance(Vector2(x,z))
+		height-=0.3*(1.0-smoothstep(-0.5,1.5,distance))
+	# Level ponds with continuous banks; creek segments retain their downhill flow.
+	for i in range(mini(ponds.size(),pond_levels.size())):
+		var e: Vector4=ponds[i]
+		var q: float=Vector2((x-e.x)/e.z,(z-e.y)/e.w).length()
+		var bank: float=(q-1.0)*minf(e.z,e.w)
+		if bank<4.0:
+			var level: float=pond_levels[i]
+			height=lerpf(height,level,1.0-smoothstep(0.0,4.0,bank))
 	return height
 
 func ground_point(x: float, z: float, offset: float = 0.0) -> Vector3:
@@ -51,6 +75,7 @@ func in_ellipse(p: Vector3, e: Vector4) -> bool:
 
 func lie_at(p: Vector3) -> String:
 	if absf(p.x) > 155.0 or p.z > 45.0 or p.z < -length_m - 65.0: return "OUT OF BOUNDS"
+	if creek_distance(Vector2(p.x,p.z))<0: return "WATER"
 	for e in ponds:
 		if in_ellipse(p, e): return "WATER"
 	for e in bunkers:
@@ -85,6 +110,10 @@ func _configure_turf(mat: ShaderMaterial) -> void:
 	mat.set_shader_parameter("bunker_ellipses",_ellipse_uniforms(bunkers,8))
 	mat.set_shader_parameter("pond_count",mini(ponds.size(),24))
 	mat.set_shader_parameter("pond_ellipses",_ellipse_uniforms(ponds,24))
+	var path:=PackedVector2Array(); path.resize(24)
+	for i in range(creek_points.size()): path[i]=creek_points[i]
+	mat.set_shader_parameter("creek_count",creek_points.size())
+	mat.set_shader_parameter("creek_path",path)
 
 func mesh_node(mesh: Mesh, mat: Material, pos: Vector3, parent: Node = self) -> MeshInstance3D:
 	var n := MeshInstance3D.new()
@@ -135,6 +164,8 @@ func build(index: int) -> void:
 	# Clear the previous hole's hazards before sampling this hole's tee and pin.
 	# Bunkers now affect height_at(), so stale ellipses would otherwise dent them.
 	ponds.clear()
+	pond_levels.clear()
+	creek_points.clear()
 	bunkers.clear()
 	trees.clear()
 	tee = ground_point(0, 0, 0.15)
@@ -146,31 +177,16 @@ func build(index: int) -> void:
 		var z: float=-length_m*e[0]
 		bunkers.append(Vector4(center_x(z)+e[1],z,e[2],e[3]))
 	for e in layout.get("water",[]): ponds.append(Vector4(pin.x+e[0],pin.z+e[1],e[2],e[3]))
+	for e in ponds: pond_levels.append(base_height_at(e.x,e.y)-0.25)
 	if layout.get("creek",false):
 		for i in range(20):
 			var z: float=-length_m*(0.28+i*0.032)
-			ponds.append(Vector4(center_x(z)-fairway_width(z)-6,z,4.5,12))
+			var x: float=center_x(z)-fairway_width(z)-6
+			creek_points.append(Vector2(x,z))
+			ponds.append(Vector4(x,z,4.5,4.5))
 	var backdrop:=PlaneMesh.new(); backdrop.size=Vector2(4000,4000)
 	mesh_node(backdrop,material(Color("547449")),Vector3(0,-24,-length_m*0.5))
 	_build_ground()
-	for e in ponds:
-		# A dark damp shelf separates water from turf and hides the procedural seam.
-		_patch(Vector4(e.x,e.y,e.z+1.35,e.w+1.35),Color("365f3b"),0.075)
-	_build_water_surface()
-	_patch(Vector4(pin.x,pin.z,green_radii.x+3,green_radii.y+3), Color("537e43"), 0.12)
-	_patch(Vector4(pin.x,pin.z,green_radii.x,green_radii.y), Color("739650"), 0.16)
-	# Subtle green mowing stripes; their geometry follows the playable slope.
-	for j in range(-6,7):
-		var x: float = pin.x + j * green_radii.x/7.0
-		var half: float = green_radii.y*0.94*sqrt(maxf(0.0,1.0-pow((x-pin.x)/green_radii.x,2)))
-		_strip(x, pin.z-half, pin.z+half, 1.1, Color("799c55"))
-	# Draw bunkers after the green and its mowing stripes so sand cuts cleanly
-	# through the putting surface instead of inheriting painted turf ribbons.
-	for e in bunkers:
-		_ring_patch(Vector4(e.x,e.y,e.z+2.2,e.w+2.2),Vector4(e.x,e.y,e.z+1.15,e.w+1.15),Color("537646"),0.10)
-		_ring_patch(Vector4(e.x,e.y,e.z+1.15,e.w+1.15),e,Color("8b7652"),0.12)
-		_patch(e, Color("eedbab"), 0.20)
-	_patch(Vector4(0,0,8,5), Color("86ac5d"), 0.18)
 	for side in [-1,1]:
 		sphere(ground_point(side*5,0,0.20),0.18,Color("f4de97"))
 	# A pin you can see from the fairway.
@@ -187,143 +203,40 @@ func build(index: int) -> void:
 	_build_details()
 
 func _build_ground() -> void:
-	var st := SurfaceTool.new()
+	# A single indexed heightfield owns every playing surface. Material boundaries
+	# are evaluated on this mesh; there are no elevated green/stripe/hazard decals.
+	var st:=SurfaceTool.new()
 	st.begin(Mesh.PRIMITIVE_TRIANGLES)
-	var step: float = 5.0
-	for zi in range(int((length_m+160)/step)):
-		var z: float = 65.0 - zi*step
-		for xi in range(70):
-			var x: float = -175.0 + xi*step
-			# Refine only cells touching a bunker. This prevents broad terrain
-			# triangles from spanning its bowl without quadrupling the whole course.
-			var divisions: int=1
-			for e in bunkers:
-				if x+step>=e.x-e.z-2.2 and x<=e.x+e.z+2.2 and z>=e.y-e.w-2.2 and z-step<=e.y+e.w+2.2:
-					divisions=4
-					break
-			var fine: float=step/divisions
-			for sy in range(divisions):
-				for sx in range(divisions):
-					var cell_x: float=x+sx*fine; var cell_z: float=z-sy*fine
-					for offset in [Vector2(0,0),Vector2(fine,0),Vector2(0,-fine),Vector2(fine,0),Vector2(fine,-fine),Vector2(0,-fine)]:
-						var p := ground_point(cell_x+offset.x,cell_z+offset.y)
-						var fair: bool = p.z < -10 and p.z > -length_m and absf(p.x-center_x(p.z)) < fairway_width(p.z)
-						var col := Color("315b36")
-						if fair: col = Color("659647") if int((-p.z+p.x*0.35)/10.0)%2 == 0 else Color("59863d")
-						else: col = col.lightened(0.035*sin(p.z*0.08+p.x*0.12))
-						st.set_color(col)
-						st.add_vertex(p)
-	st.generate_normals()
-	var m := ShaderMaterial.new()
-	m.shader=preload("res://game/turf.gdshader")
-	m.set_shader_parameter("hole_length",length_m)
-	m.set_shader_parameter("hole_bend",bend)
-	m.set_shader_parameter("par_five",Data.HOLES[hole_index][1]==5)
-	m.set_shader_parameter("route_x",PackedFloat32Array(Layouts.HOLES[hole_index].x))
-	m.set_shader_parameter("route_width",PackedFloat32Array(Layouts.HOLES[hole_index].w))
-	_configure_turf(m)
-	terrain_mesh = mesh_node(st.commit(),m,Vector3.ZERO)
-
-func _patch(e: Vector4, color: Color, offset: float) -> void:
-	var st := SurfaceTool.new()
-	st.begin(Mesh.PRIMITIVE_TRIANGLES)
-	var is_hazard: bool=color==Color("4b9390") or color==Color("eedbab")
-	# Every overlay follows the terrain at short intervals. Large one-piece green
-	# fans can otherwise bridge across an adjacent bunker and show through its sand.
-	var rings: int=12
-	var sectors: int=96 if is_hazard else 64
-	for ring in range(rings):
-		var r0: float=float(ring)/rings; var r1: float=float(ring+1)/rings
-		for i in range(sectors):
-			var a: float=TAU*i/sectors; var b: float=TAU*(i+1)/sectors
-			var points=[Vector3(e.x+cos(a)*e.z*r0,0,e.y+sin(a)*e.w*r0),Vector3(e.x+cos(b)*e.z*r0,0,e.y+sin(b)*e.w*r0),Vector3(e.x+cos(a)*e.z*r1,0,e.y+sin(a)*e.w*r1),Vector3(e.x+cos(b)*e.z*r1,0,e.y+sin(b)*e.w*r1)]
-			for k in [0,1,2,2,1,3]:
-				var p: Vector3=points[k]
-				if color==Color("4b9390"):
-					# All overlapping ellipses use the identical surface function, preventing
-					# intersecting planes and bright triangular seams in compound ponds.
-					p.y=height_at(p.x,p.z)+offset
-				elif color==Color("eedbab"):
-					# Sand follows the same bowl used by collision and ball physics.
-					p.y=height_at(p.x,p.z)+offset
-				else: p.y=height_at(p.x,p.z)+offset
-				st.add_vertex(p)
-	st.generate_normals()
-	var mat: Material=material(color)
-	if color.g>color.r:
-		var turf:=ShaderMaterial.new(); turf.shader=preload("res://game/turf.gdshader")
-		turf.set_shader_parameter("use_vertex_color",false); turf.set_shader_parameter("turf_color",color.darkened(0.12)); mat=turf
-		turf.set_shader_parameter("cut_kind",0 if e.x==0 and e.y==0 else 4)
-		_configure_turf(turf)
-	if is_hazard:
-		var hazard_mat:=ShaderMaterial.new(); hazard_mat.shader=preload("res://game/hazard.gdshader")
-		hazard_mat.set_shader_parameter("water",color==Color("4b9390"))
-		hazard_mat.set_shader_parameter("ellipse",e)
-		mat=hazard_mat
-	mesh_node(st.commit(),mat,Vector3.ZERO)
-
-func _ring_patch(outer: Vector4,inner: Vector4,color: Color,offset: float) -> void:
-	# A rim is an annulus, never a filled disc. Keeping its center empty guarantees
-	# that turf and exposed-earth geometry cannot overlap the sand interior.
-	var st:=SurfaceTool.new(); st.begin(Mesh.PRIMITIVE_TRIANGLES)
-	var sectors: int=96
-	for i in range(sectors):
-		var a: float=TAU*i/sectors; var b: float=TAU*(i+1)/sectors
-		var points=[Vector3(inner.x+cos(a)*inner.z,0,inner.y+sin(a)*inner.w),Vector3(outer.x+cos(a)*outer.z,0,outer.y+sin(a)*outer.w),Vector3(inner.x+cos(b)*inner.z,0,inner.y+sin(b)*inner.w),Vector3(outer.x+cos(b)*outer.z,0,outer.y+sin(b)*outer.w)]
-		for k in [0,1,2,2,1,3]:
-			var p: Vector3=points[k]
-			p.y=height_at(p.x,p.z)+offset
-			st.add_vertex(p)
-	st.generate_normals()
-	var mat: Material=material(color)
-	if color.g>color.r:
-		var turf:=ShaderMaterial.new(); turf.shader=preload("res://game/turf.gdshader")
-		turf.set_shader_parameter("use_vertex_color",false); turf.set_shader_parameter("turf_color",color.darkened(0.12)); turf.set_shader_parameter("cut_kind",4)
-		_configure_turf(turf)
-		mat=turf
-	mesh_node(st.commit(),mat,Vector3.ZERO)
-
-func _build_water_surface() -> void:
-	if ponds.is_empty(): return
-	var min_x: float=INF; var max_x: float=-INF; var min_z: float=INF; var max_z: float=-INF
-	for e in ponds:
-		min_x=minf(min_x,e.x-e.z); max_x=maxf(max_x,e.x+e.z)
-		min_z=minf(min_z,e.y-e.w); max_z=maxf(max_z,e.y+e.w)
-	var st:=SurfaceTool.new(); st.begin(Mesh.PRIMITIVE_TRIANGLES)
-	var step: float=1.5
-	var nx: int=int(ceil((max_x-min_x)/step)); var nz: int=int(ceil((max_z-min_z)/step))
-	for iz in range(nz):
-		var z: float=min_z+iz*step
-		for ix in range(nx):
-			var x: float=min_x+ix*step
-			for p in [Vector2(x,z),Vector2(x+step,z),Vector2(x,z+step),Vector2(x,z+step),Vector2(x+step,z),Vector2(x+step,z+step)]:
-				st.add_vertex(ground_point(p.x,p.y,0.12))
-	st.generate_normals()
-	var water_mat:=ShaderMaterial.new(); water_mat.shader=preload("res://game/hazard.gdshader")
-	water_mat.set_shader_parameter("water",true)
-	water_mat.set_shader_parameter("pond_count",mini(ponds.size(),24))
-	water_mat.set_shader_parameter("pond_ellipses",_ellipse_uniforms(ponds,24))
-	# Shore color comes from the damp-bank geometry; a large ellipse keeps this
-	# single union surface in the shader's deep-water range.
-	water_mat.set_shader_parameter("ellipse",Vector4((min_x+max_x)*0.5,(min_z+max_z)*0.5,maxf(1.0,max_x-min_x)*8.0,maxf(1.0,max_z-min_z)*8.0))
-	mesh_node(st.commit(),water_mat,Vector3.ZERO)
-
-func _strip(x: float,z1: float,z2: float,width: float,col: Color) -> void:
-	var st := SurfaceTool.new()
-	st.begin(Mesh.PRIMITIVE_TRIANGLES)
-	# Segment mowing stripes so they bend into nearby terrain instead of forming a
-	# single long plane that can cut across and appear inside a bunker.
-	var segments: int=maxi(1,ceili(absf(z2-z1)/1.25))
-	for i in range(segments):
-		var za: float=lerpf(z1,z2,float(i)/segments)
-		var zb: float=lerpf(z1,z2,float(i+1)/segments)
-		for p in [Vector2(x,za),Vector2(x,zb),Vector2(x+width,za),Vector2(x+width,za),Vector2(x,zb),Vector2(x+width,zb)]:
-			st.add_vertex(ground_point(p.x,p.y,0.18))
-	st.generate_normals()
-	var turf:=ShaderMaterial.new(); turf.shader=preload("res://game/turf.gdshader")
-	turf.set_shader_parameter("use_vertex_color",false); turf.set_shader_parameter("turf_color",col.darkened(0.12))
-	_configure_turf(turf)
-	mesh_node(st.commit(),turf,Vector3.ZERO)
+	var step: float=1.25
+	var nx: int=280
+	var nz: int=ceili((length_m+160.0)/step)
+	var heights:=PackedFloat32Array()
+	heights.resize((nx+1)*(nz+1))
+	for zi in range(nz+1):
+		for xi in range(nx+1):
+			heights[zi*(nx+1)+xi]=height_at(-175.0+xi*step,65.0-zi*step)
+	for zi in range(nz+1):
+		for xi in range(nx+1):
+			var at: int=zi*(nx+1)+xi
+			var left: int=maxi(0,xi-1); var right: int=mini(nx,xi+1)
+			var front: int=maxi(0,zi-1); var back: int=mini(nz,zi+1)
+			var dx: float=(heights[zi*(nx+1)+right]-heights[zi*(nx+1)+left])/((right-left)*step)
+			var dz: float=(heights[front*(nx+1)+xi]-heights[back*(nx+1)+xi])/((back-front)*step)
+			st.set_normal(Vector3(-dx,1,-dz).normalized())
+			st.add_vertex(Vector3(-175.0+xi*step,heights[at],65.0-zi*step))
+	for zi in range(nz):
+		for xi in range(nx):
+			var a: int=zi*(nx+1)+xi
+			for index in [a,a+nx+1,a+1,a+1,a+nx+1,a+nx+2]: st.add_index(index)
+	var mat:=ShaderMaterial.new()
+	mat.shader=preload("res://game/course_surface.gdshader")
+	mat.set_shader_parameter("hole_length",length_m)
+	mat.set_shader_parameter("route_x",PackedFloat32Array(Layouts.HOLES[hole_index].x))
+	mat.set_shader_parameter("route_width",PackedFloat32Array(Layouts.HOLES[hole_index].w))
+	mat.set_shader_parameter("green",Vector4(pin.x,pin.z,green_radii.x,green_radii.y))
+	_configure_turf(mat)
+	terrain_mesh=mesh_node(st.commit(),mat,Vector3.ZERO)
+	terrain_mesh.name="ContinuousPlayingSurface"
 
 func _instances(mesh: Mesh, transforms: Array, color: Color) -> void:
 	var mm := MultiMesh.new()
@@ -347,8 +260,9 @@ func _instances_authored(mesh: Mesh, transforms: Array) -> void:
 	add_child(node)
 
 func _mesh_from_scene(path: String) -> Mesh:
+	if authored_mesh_cache.has(path): return authored_mesh_cache[path]
 	var root: Node
-	if ResourceLoader.exists(path):
+	if ResourceLoader.exists(path) and (not path.ends_with(".glb") or not FileAccess.file_exists(path)):
 		var packed: PackedScene=load(path)
 		if packed==null: return null
 		root=packed.instantiate()
@@ -364,6 +278,7 @@ func _mesh_from_scene(path: String) -> Mesh:
 		root.free(); return null
 	var result: Mesh=nodes[0].mesh.duplicate()
 	root.free()
+	authored_mesh_cache[path]=result
 	return result
 
 func _build_authored_trees() -> bool:
@@ -380,7 +295,7 @@ func _build_authored_trees() -> bool:
 		trees.append(Vector3(x,p.y+h*0.5,z))
 		var s: float=h/16.0
 		var basis:=Basis().rotated(Vector3.UP,rng.randf_range(0,TAU)).scaled(Vector3(s*rng.randf_range(0.86,1.08),s,s*rng.randf_range(0.86,1.08)))
-		var transform:=Transform3D(basis,p+Vector3(0,h*0.46,0))
+		var transform:=Transform3D(basis,p)
 		if i%3!=0: pines.append(transform)
 		else: broadleaf.append(transform)
 	_instances_authored(pine_mesh,pines)
@@ -492,7 +407,7 @@ func _build_flowers() -> void:
 		var a: float = rng.randf_range(PI*0.92,TAU*1.04)
 		var r: float = rng.randf_range(28,43)
 		var p := ground_point(pin.x+cos(a)*r,pin.z+sin(a)*r,0.6)
-		if lie_at(p)=="WATER": continue
+		if lie_at(p) in ["WATER","BUNKER","GREEN"]: continue
 		leaves.append(Transform3D(Basis().scaled(Vector3(1.1,0.7,1.1)),p))
 		for j in range(12):
 			var a2: float=rng.randf_range(0,TAU)
