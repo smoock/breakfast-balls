@@ -6,7 +6,9 @@ A playable native Godot 4.7 golf prototype: local hot-seat golf, playful golfers
 
 Open `project.godot` in Godot and press **F6** with the main scene open, or **F5** to run the project. Choose 1–4 players, each golfer, Stroke Play or Skins, and a 3-, 9-, or 18-hole round. Three-hole rounds draw three distinct random holes in random order. Nine-hole rounds offer Front 9 (1–9) or Back 9 (10–18). All eight golfers have identical gameplay stats.
 
-For free remote play, choose **Parsec Remote Play** on the clubhouse screen. The setup card can open Parsec and explains the host flow: enable Hosting, share the computer link, accept each guest, and grant keyboard and mouse permission. Return to the game, choose a player count, and enable **Timing**. Player 1 is the host and remains unadjusted. Before the round, each guest completes three one-way meter passes; the median measured delay corrects that player's clubface evaluation while leaving the visible meter, its speed, and the swing mechanic unchanged.
+The clubhouse **Settings** menu contains tees, swing-input guidance, sound, Parsec remote play and guest timing. Close it with Done or Escape; closing the Parsec card returns to Settings. Practice stays directly accessible on the home screen.
+
+For free remote play, open **Settings → Parsec remote play** from the clubhouse. The setup card can open Parsec and explains the host flow: enable Hosting, share the computer link, accept each guest, and grant keyboard and mouse permission. Return to the game, choose a player count, and enable **Guest timing** in Settings. Player 1 is the host and remains unadjusted. Before the round, each guest completes three one-way meter passes; the median measured delay corrects that player's clubface evaluation while leaving the visible meter, its speed, and the swing mechanic unchanged.
 
 Parsec requires no game SDK, App ID, submission fee, or game server. It streams the host's screen and merges guest input into the existing local hot-seat controls. On macOS, Parsec hosting requires Screen Recording and Accessibility permission. Guests need keyboard and mouse permission because Breakfast Balls does not currently use gamepads. For safer sharing, close private windows before hosting; Parsec's macOS host does not support its Approved Apps restriction.
 
@@ -18,6 +20,22 @@ Parsec requires no game SDK, App ID, submission fee, or game server. It streams 
 - S cycles spin, V shows the whole hole, Tab opens the scorecard, H opens help, and Escape pauses.
 - Enter continues after a shot or advances from a completed-hole scorecard.
 - On greens, the gold arrow shows the local downhill direction. Adjust aim and power for the break.
+
+## Touch, practice, and tee options
+
+Choose **Keyboard** or **Mouse & Trackpad** in **Settings** or Help. This remembers the guidance in `user://preferences.cfg`; both swing inputs remain available. Mouse/trackpad swings must begin near the top of the gold swing pad with the click held through the drag. Space still builds power continuously and releases against the face meter. All existing timing, rough/sand contact speed, shot shaping, and overswing penalties remain.
+
+Wedges (PW, GW, SW, LW) now offer **Full / Pitch / Chip** buttons; **X** cycles the shot type before starting a swing. Pitch uses 60% of the club's full carry range, with lofted flight and a softer landing. Chip uses 24%, with lower flight and more rollout. Animation amplitude, flight and range come from the same profiles in `game/data.gd`. These are arcade touch profiles; they retain the single hold-and-release mechanic. Club, spin and shot type cannot change during a charged swing.
+
+Putter range, live estimated roll, travel and cup distance use feet. The full-stroke scale stays fixed during flight and on the result, then updates for the next lie. Airborne shots use yards for both carry and cup distance. Wedges show a lie-adjusted carry estimate while charging. Results report carry and rollout separately (putts report roll), plus the clubface and starting direction. Carry estimates are level-ground baselines; slope, wind, lateral break, hazards, spin and impacts can change the actual shot.
+
+**Short-game practice** starts immediately from the clubhouse: a 24-foot putt, 22-yard chip, and 55-yard pitch on the bunker-free fourteenth. Click a station or press **1 / 2 / 3**. **R** instantly retries, including during flight; Enter or Retry Shot repeats from a result. A retry preserves your club, shot type, spin and aim. Stations have fixed origins and zero wind; no scores, Breakfast Balls, replays or records are awarded. Escape → End round returns to the clubhouse and restores the previous round setup.
+
+Choose tees in **Settings**. **Championship** preserves the existing course. **Club tees** move four par-4 starts forward along their current routing: hole 3 is 285 yards (was 350), hole 5 is 420 (495), hole 7 is 395 (450), and hole 14 is 375 (440). Other holes, hazards and greens retain their layout. Tee turf, markers, furniture, lies and the yardage book use the selected tee position. Listed yardages remain longitudinal routing baselines. Pin Challenge always uses championship tees.
+
+The existing record book stays the championship book. Club tees have separate scores, longest drives and ace counts, stored alongside it under `club_tees` in `user://leaderboard.json`. The leaderboard offers tabs for both books. A tee choice is captured at the start of the round.
+
+Verification: `tests/feedback_tests.gd` covers saved guidance, both swing inputs, repeatable physical practice shots, safe state changes, tee geometry, Breakfast Balls from alternate tees, record persistence/isolation, and chip/pitch carry, height and rollout. `tests/feedback_visual_qa.gd` uses viewport keyboard and button events through the practice and normal-round journeys and captures screenshots to `/private/tmp/breakfast-feedback-*.png`. Run either with Godot `--path . --script res://tests/<name>.gd`; use `--headless` for the first. Human playtesting still decides whether the short-game feel is right.
 
 ## Breakfast Ball and Pin Challenge
 
@@ -49,7 +67,7 @@ The shared terrain model controls ball bounce, roll, green slope, rough, bunkers
 
 The [Trackman PGA Tour averages chart, published May 2, 2024](https://www.trackman.com/blog/introducing-updated-tour-averages), supplies these carry baselines in yards: Driver 282, 3W 249, 5W 236, hybrid 231, 5i 199, 6i 188, 7i 176, 8i 164, 9i 152, PW 142.
 
-The chart does not specify a 4-hybrid or the three specialty wedges. The 4H uses its generic hybrid figure as a proxy; GW 120, SW 105 and LW 85 are explicitly gameplay estimates, not measured PGA averages. The putter uses a variable 6–35-yard power scale rather than a fictitious carry average. Estimated values are identified in the game data/UI.
+The chart does not specify a 4-hybrid or the three specialty wedges. The 4H uses its generic hybrid figure as a proxy; GW 120, SW 105 and LW 85 are explicitly gameplay estimates, not measured PGA averages. The putter uses a variable 18–105-foot power scale rather than a fictitious carry average. Estimated values are identified in the game data/UI.
 
 ## Course and visual direction
 

@@ -52,6 +52,7 @@ func _draw() -> void:
 	if game.state=="result": _result()
 	if game.state in ["scorecard","finished"]: _scorecard()
 	if game.state=="pause": _pause()
+	if game.settings_open: _settings()
 	if game.help_open: _help()
 	if game.parsec_setup_open: _parsec_setup()
 
@@ -87,27 +88,19 @@ func _menu() -> void:
 	button(Rect2(38,574,399,60),"LET'S PLAY GOLF    →","play",false,true)
 	button(Rect2(38,649,126,40),"How to swing","help")
 	button(Rect2(174,649,126,40),"Leaderboard","leaderboard")
-	button(Rect2(310,649,127,40),"Sound: "+("on" if game.sound_enabled else "off"),"sound")
-	button(Rect2(38,699,194,35),"TIMING: "+("ON" if game.remote_timing_enabled else "OFF"),"remote",game.remote_timing_enabled)
-	button(Rect2(243,699,194,35),"PARSEC REMOTE PLAY","parsec",false,true)
-	text(Vector2(38,758),game.parsec_status,12,GOLD,bold)
-	text(Vector2(38,782),"Give guests keyboard + mouse permission.",13,MUTED)
+	button(Rect2(310,649,127,40),"Settings","settings")
+	button(Rect2(38,704,399,44),"Short-game practice","practice")
 	panel(Rect2(502,25,745,56),Color(0.06,0.19,0.15,0.84),12)
 	text(Vector2(522,48),"MAGNOLIA PINES",17,CREAM,bold)
 	text(Vector2(522,68),"18 original holes · Augusta-inspired southern golf",12,Color("d4e0bf"))
 	center(Rect2(1125,29,103,44),"PAR 72",16,GOLD,bold)
-	panel(Rect2(504,111,740,149),Color(0.065,0.19,0.15,0.92),16)
-	text(Vector2(526,142),"DINER SPECIAL · CLOSEST TO PIN" if game.mode==2 else "FIRST TEE SPECIAL · THE BREAKFAST BALL",13,GOLD,bold)
-	text(Vector2(526,176),"Three pins. Three swings. Bragging rights." if game.mode==2 else "Bad opening shot? Order a fresh start.",23,CREAM,serif)
-	text(Vector2(526,204),"Hole out for 100 points; otherwise lose 1 per foot, rounded up." if game.mode==2 else "Each golfer may replay their opening tee shot once. Press B at the result.",14,MUTED)
-	text(Vector2(526,228),"Missed green: 0. Same wind for everyone. No Breakfast Balls." if game.mode==2 else "Using it clears the shot + penalty and makes your round ineligible for records.",14,MUTED)
-	panel(Rect2(504,294,740,479),Color(0.065,0.19,0.15,0.94),16)
-	text(Vector2(526,326),"PICK YOUR ALTER EGO",13,GOLD,bold)
+	panel(Rect2(504,111,740,479),Color(0.065,0.19,0.15,0.94),16)
+	text(Vector2(526,143),"PICK YOUR ALTER EGO",13,GOLD,bold)
 	for i in range(game.player_count):
-		button(Rect2(526+i*170,341,160,33),"P%d  %s"%[i+1,Data.GOLFERS[game.roster[i]][0].split(" ")[0]],"slot:%d"%i,game.active_slot==i)
+		button(Rect2(526+i*170,158,160,33),"P%d  %s"%[i+1,Data.GOLFERS[game.roster[i]][0].split(" ")[0]],"slot:%d"%i,game.active_slot==i)
 	for i in range(8):
 		var x: float=526+(i%4)*175
-		var y: float=388+int(i/4)*182
+		var y: float=205+int(i/4)*182
 		var r:=Rect2(x,y,162,174)
 		var selected: bool=game.roster[game.active_slot]==i
 		panel(r,Color("37624f") if selected else Color("21473b"),10,GOLD if selected else Color("436350"))
@@ -117,6 +110,39 @@ func _menu() -> void:
 		text(Vector2(x+12,y+139),name[0],15,CREAM,bold)
 		text(Vector2(x+12,y+160),name[1],15,CREAM,bold)
 		buttons.append([r,"golfer:%d"%i])
+
+	panel(Rect2(504,614,740,159),Color(0.065,0.19,0.15,0.92),16)
+	text(Vector2(526,645),"DINER SPECIAL · CLOSEST TO PIN" if game.mode==2 else "FIRST TEE SPECIAL · THE BREAKFAST BALL",13,GOLD,bold)
+	text(Vector2(526,679),"Three pins. Three swings. Bragging rights." if game.mode==2 else "Bad opening shot? Order a fresh start.",23,CREAM,serif)
+	text(Vector2(526,708),"Hole out for 100 points; otherwise lose 1 per foot, rounded up." if game.mode==2 else "Each golfer may replay their opening tee shot once. Press B at the result.",14,MUTED)
+	text(Vector2(526,734),"Missed green: 0. Same wind for everyone. No Breakfast Balls." if game.mode==2 else "Using it clears the shot + penalty and makes your round ineligible for records.",14,MUTED)
+
+func _settings() -> void:
+	buttons.clear()
+	draw_rect(Rect2(0,0,1280,800),Color(0.02,0.08,0.05,0.78))
+	panel(Rect2(270,76,740,650),CREAM,18)
+	text(Vector2(306,115),"CLUBHOUSE SETTINGS",12,Color("647454"),bold)
+	text(Vector2(306,165),"Make it your game.",34,INK,serif)
+	text(Vector2(306,205),"SWING INPUT",12,INK,bold)
+	button(Rect2(306,219,250,40),"Keyboard","input:0",game.input_style==0)
+	button(Rect2(568,219,406,40),"Mouse & Trackpad","input:1",game.input_style==1)
+	text(Vector2(306,298),"TEES",12,INK,bold)
+	if game.mode==2:
+		text(Vector2(306,336),"Pin Challenge always uses championship tees.",16,INK)
+	else:
+		button(Rect2(306,310,328,40),"Championship","tees:0",game.tees==0)
+		button(Rect2(646,310,328,40),"Club tees","tees:1",game.tees==1)
+	text(Vector2(306,375),"Club tees shorten holes 3, 5, 7 & 14. Each setup has its own record book.",13,Color("647454"))
+	draw_line(Vector2(306,397),Vector2(974,397),Color("d4d0ba"),1)
+	text(Vector2(306,430),"SOUND",12,INK,bold)
+	button(Rect2(720,407,254,40),"Sound: "+("on" if game.sound_enabled else "off"),"sound",game.sound_enabled)
+	text(Vector2(306,483),"PLAY WITH FRIENDS",12,INK,bold)
+	button(Rect2(306,497,328,42),"Parsec remote play","parsec")
+	button(Rect2(646,497,328,42),"Guest timing: "+("on" if game.remote_timing_enabled else "off"),"remote",game.remote_timing_enabled)
+	text(Vector2(306,566),"Parsec shares your game with guests. Enable timing to calibrate their swings.",13,Color("647454"))
+	text(Vector2(306,589),"Choose the player count on the home screen. Player 1 hosts.",13,Color("647454"))
+	text(Vector2(306,675),"ESC  Back to clubhouse",12,Color("647454"))
+	button(Rect2(714,647,260,44),"DONE","closesettings",false,true)
 
 func _name_entry() -> void:
 	buttons.clear()
@@ -165,7 +191,7 @@ func _parsec_setup() -> void:
 		["01", "Open Parsec and enable Hosting on this computer."],
 		["02", "Choose Share in Parsec and send the link to your guests."],
 		["03", "Accept each guest, then grant keyboard and mouse access."],
-		["04", "Return here, choose the player count, and enable Timing."]
+		["04", "Enable Guest timing in Settings; choose players on the home screen."]
 	]
 	for i in range(steps.size()):
 		var y: float=286+i*67
@@ -173,11 +199,11 @@ func _parsec_setup() -> void:
 		center(Rect2(345,y-25,40,40),steps[i][0],12,INK,bold)
 		text(Vector2(402,y),steps[i][1],14,Color("65735c"))
 	button(Rect2(390,570,238,46),"OPEN PARSEC","openparsec",false,true)
-	button(Rect2(652,570,238,46),"BACK TO CLUBHOUSE","closeparsec")
+	button(Rect2(652,570,238,46),"BACK TO SETTINGS" if game.settings_open else "BACK TO CLUBHOUSE","closeparsec")
 	center(Rect2(350,634,580,20),"Guests share the active player's mouse or Space-bar swing.",12,Color("647454"))
 
 func _record_line(y: float,label: String,key: String,suffix: String) -> void:
-	var record: Dictionary=game.leaderboard[key]
+	var record: Dictionary=game.record_book(game.record_tees)[key]
 	var empty: bool=str(record.name)=="-----"
 	text(Vector2(394,y),label,14,Color("647454"),bold)
 	text(Vector2(606,y),str(record.name),18,INK,bold)
@@ -189,7 +215,9 @@ func _leaderboard() -> void:
 	draw_rect(Rect2(0,0,1280,800),Color(0.02,0.08,0.05,0.72))
 	panel(Rect2(325,132,630,536),CREAM,18)
 	center(Rect2(355,169,570,30),"THE MAGNOLIA PINES RECORD BOOK",12,Color("647454"),bold)
-	center(Rect2(355,207,570,47),"Local legends live here.",31,INK,serif)
+	center(Rect2(355,199,570,32),"Local legends live here.",28,INK,serif)
+	button(Rect2(394,239,240,28),"Championship","recordtees:0",game.record_tees==0)
+	button(Rect2(646,239,240,28),"Club tees","recordtees:1",game.record_tees==1)
 	draw_line(Vector2(378,273),Vector2(902,273),Color("c9c5ad"),1)
 	_record_line(304,"HOLES IN ONE","hole_in_ones"," total")
 	_record_line(354,"LONGEST DRIVE","longest_drive"," yd")
@@ -264,13 +292,13 @@ func _game_hud() -> void:
 	text(Vector2(43,54),"Breakfast Balls.",25,CREAM,serif)
 	text(Vector2(44,78),"MAGNOLIA PINES",11,GOLD,bold)
 	draw_line(Vector2(273,38),Vector2(273,81),Color("53745c"),1)
-	text(Vector2(295,53),"HOLE %02d · %d/%d"%[game.hole_index+1,game.round_position+1,game.round_length],14,GOLD,bold)
-	text(Vector2(295,79),h[0],19,CREAM,bold)
-	text(Vector2(505,53),"PAR %d"%h[1],17,CREAM,bold)
-	text(Vector2(505,77),"%d YARDS"%h[2],12,MUTED)
-	text(Vector2(629,53),"CLOSEST TO PIN" if game.mode==2 else "STROKE PLAY" if game.mode==0 else "SKINS · POT %d"%game.skin_pot,14,GOLD,bold)
-	text(Vector2(629,78),"%d PLAYER%s · %s"%[game.player_count,"" if game.player_count==1 else "S","REMOTE TIMING" if game.remote_timing_enabled else "LOCAL"],12,MUTED)
-	button(Rect2(866,40,105,39),"Card","card")
+	text(Vector2(295,53),"PRACTICE · 1 / 2 / 3" if game.practice_active else "HOLE %02d · %d/%d"%[game.hole_index+1,game.round_position+1,game.round_length],14,GOLD,bold)
+	text(Vector2(295,79),["24-foot putt","22-yard chip","55-yard pitch"][game.practice_station] if game.practice_active else h[0],19,CREAM,bold)
+	text(Vector2(505,53),"CALM" if game.practice_active else "PAR %d"%h[1],17,CREAM,bold)
+	text(Vector2(505,77),"NO RECORDS" if game.practice_active else "%d YARDS"%Data.hole_yards(game.hole_index,game.round_tees),12,MUTED)
+	text(Vector2(629,53),"SHORT GAME" if game.practice_active else "CLOSEST TO PIN" if game.mode==2 else "STROKE PLAY" if game.mode==0 else "SKINS · POT %d"%game.skin_pot,14,GOLD,bold)
+	text(Vector2(629,78),"R RETRY · 1/2/3 STATION" if game.practice_active else game.tee_name(game.round_tees).to_upper()+(" · REMOTE" if game.remote_timing_enabled else ""),12,MUTED)
+	button(Rect2(866,40,105,39),"Retry" if game.practice_active else "Card","retrypractice" if game.practice_active else "card")
 	button(Rect2(981,40,105,39),"Flyover","overview",game.overview)
 	button(Rect2(1096,40,62,39),"?","help")
 	button(Rect2(1168,40,65,39),"Ⅱ","pause")
@@ -281,6 +309,10 @@ func _game_hud() -> void:
 	text(Vector2(91,146),"P%d · %s · %s"%[game.player_index+1,p.tag,game.relative_score(game.player_index)],12,GOLD,bold)
 	text(Vector2(91,171),Data.GOLFERS[p.golfer][0],19,CREAM,bold)
 	text(Vector2(91,192),"SHOT %d  /  %s"%[p.strokes+1 if game.state=="aim" else p.strokes,game.course.lie_at(game.ball_pos)],12,MUTED)
+	if game.practice_active:
+		panel(Rect2(24,292,308,100),INK,12)
+		text(Vector2(40,317),"PRACTICE STATIONS · 1 / 2 / 3",11,GOLD,bold)
+		for i in range(3): button(Rect2(36+i*98,332,92,39),["Putt","Chip","Pitch"][i],"station:%d"%i,game.practice_station==i)
 	if p.breakfast_used:
 		panel(Rect2(24,290,222,29),INK,8)
 		center(Rect2(24,290,222,29),"BREAKFAST BALL USED",11,GOLD,bold)
@@ -312,12 +344,16 @@ func _game_hud() -> void:
 	panel(Rect2(24,577,914,179),Color(0.06,0.18,0.14,0.96),14)
 	text(Vector2(45,605),"THE BAG",11,GOLD,bold)
 	text(Vector2(45,639),Data.CLUBS[game.club][0],27,CREAM,serif)
-	var range_label: String="%d yd %s"%[roundi(game.club_range()),"roll scale" if game.club==13 else "stock carry"]
+	var range_label: String=game.range_text()
 	text(Vector2(45,665),range_label,15,MUTED)
-	text(Vector2(45,688),"Est. distance" if Data.CLUBS[game.club][4] and game.club!=13 else "Tour carry baseline" if game.club!=13 else "Surface-adjusted roll estimate",11,MUTED)
-	button(Rect2(45,706,44,33),"‹","club:-1")
-	button(Rect2(98,706,44,33),"›","club:1")
-	text(Vector2(157,728),"Q / E",11,MUTED)
+	text(Vector2(45,688),"Surface-adjusted estimate" if game.club==13 else "Low flight · more rollout" if game.style_index()==2 else "Lofted flight · soft landing" if game.style_index()==1 else "Lie-adjusted carry baseline",11,MUTED)
+	if game.club>=9 and game.club<=12:
+		for i in range(3): button(Rect2(45+i*73,704,68,29),Data.SHOT_STYLES[i].name,"shotstyle:%d"%i,game.style_index()==i)
+		text(Vector2(45,748),"X shot type · Q / E club",10,MUTED)
+	else:
+		button(Rect2(45,706,44,33),"‹","club:-1")
+		button(Rect2(98,706,44,33),"›","club:1")
+		text(Vector2(157,728),"Q / E",11,MUTED)
 	draw_line(Vector2(277,597),Vector2(277,735),Color("41634c"),1)
 	text(Vector2(299,605),"TO THE CUP",11,GOLD,bold)
 	text(Vector2(299,650),game.distance_text(),35,CREAM,bold)
@@ -332,12 +368,12 @@ func _game_hud() -> void:
 		buttons.append([r,"selectclub:%d"%i])
 	text(Vector2(527,728),"Drag the course / ← → to aim",12,MUTED)
 	_swing_pad()
-	text(Vector2(26,783),"H  Help     V  Flyover     TAB  Scorecard     ESC  Pause",12,Color("e9ebd6"))
-	text(Vector2(639,783),"Pull back. Push through. Breakfast is earned.",12,Color("e9ebd6"))
+	text(Vector2(26,783),"H  Help     V  Flyover     R  Retry     ESC  Pause" if game.practice_active else "H  Help     V  Flyover     TAB  Scorecard     ESC  Pause",12,Color("e9ebd6"))
+	text(Vector2(639,783),"R retry · 1 putt / 2 chip / 3 pitch" if game.practice_active else "Hold Space · Release on center" if game.input_style==0 else "Click gold pad · Pull down · Return & release",12,Color("e9ebd6"))
 	if game.state=="flight" and game.swing_elapsed>1.65:
 		panel(Rect2(423,116,418,72),INK,12)
 		center(Rect2(423,120,418,29),game.last_shot,16,GOLD,bold)
-		center(Rect2(423,151,418,27),"%d YARDS  ·  %s"%[roundi(game.shot_distance),"IN FLIGHT" if game.in_air else "ROLLING"],14,CREAM)
+		center(Rect2(423,151,418,27),"%s  ·  %s"%[game.shot_distance_text(game.shot_distance),"IN FLIGHT" if game.in_air else "ROLLING"],14,CREAM)
 
 func _swing_pad() -> void:
 	panel(Rect2(958,577,298,179),GOLD,14)
@@ -347,28 +383,28 @@ func _swing_pad() -> void:
 	var power: float=game.swing_power()
 	if game.dragging or game.keyboard_charge:
 		text(Vector2(976,635),"%d%%"%roundi(power*100),28,Color("9b3329") if power>1 else INK,bold)
-		panel(Rect2(976,649,112,9),Color("c5a45c"),4)
-		panel(Rect2(976,649,112*minf(power,1),9),Color("9b3329") if power>1 else INK,4)
-		text(Vector2(976,677),"OVERSWING: CONTACT LOSS" if power>1 else "PATH %+.0f%%"%(game.path_offset*100),10,Color("9b3329") if power>1 else INK,bold)
-		text(Vector2(976,696),"RELEASE: SQUARE THE FACE",10,INK,bold)
-		draw_line(Vector2(979,715),Vector2(1157,715),INK,2,true)
-		draw_rect(Rect2(1059,708,18,14),Color("7c9951"))
-		var needle: float=1068+game.face_meter()*88
-		draw_line(Vector2(needle,704),Vector2(needle,726),INK,3,true)
+		panel(Rect2(1080,620,151,10),Color("c5a45c"),4)
+		panel(Rect2(1080,620,151*minf(power,1),10),Color("9b3329") if power>1 else INK,4)
+		text(Vector2(976,660),game.power_distance_text(power),16,INK,bold)
+		text(Vector2(976,682),"OVERSWING: CONTACT LOSS" if power>1 else "PATH %+.0f%%"%(game.path_offset*100),10,Color("9b3329") if power>1 else INK,bold)
+		draw_line(Vector2(1003,710),Vector2(1217,710),INK,2,true)
+		draw_rect(Rect2(1099,703,22,14),Color("7c9951"))
+		var needle: float=1110+game.face_meter()*106
+		draw_line(Vector2(needle,699),Vector2(needle,721),INK,3,true)
+		text(Vector2(992,743),"RELEASE WITH THE NEEDLE CENTERED",10,INK,bold)
 	else:
-		text(Vector2(976,636),"01  Hold & pull back",13,INK,bold)
-		text(Vector2(976,661),"02  Push up & release",13,INK,bold)
-		text(Vector2(976,687),"Sideways pull = swing path",11,INK)
-		text(Vector2(976,706),"Release meter = clubface",11,INK)
-		text(Vector2(976,730),"Past 100% = overswing penalty",10,INK)
-	var start:=Vector2(1206,625)
-	draw_line(start,start+Vector2(0,90),Color("c5a45c"),2,true)
-	_arrow(start+Vector2(-14,25),start+Vector2(-14,78),INK,2)
-	_arrow(start+Vector2(13,78),start+Vector2(13,8),INK,2)
-	draw_circle(start,7,CREAM)
-	if game.dragging:
-		draw_line(game.drag_start,game.drag_current,INK,3,true)
-		draw_circle(game.drag_current,6,INK)
+		if game.input_style==0:
+			text(Vector2(976,634),"01  Hold SPACE for power",14,INK,bold)
+			text(Vector2(976,660),"02  Release on center",14,INK,bold)
+			text(Vector2(976,687),"A / D adjusts swing path",12,INK)
+			text(Vector2(976,709),"Keep centered for a straight path",11,INK)
+		else:
+			text(Vector2(976,628),"01  Click & hold here",13,INK,bold)
+			text(Vector2(976,651),"02  Pull down for power",13,INK,bold)
+			text(Vector2(976,674),"03  Return & release on center",12,INK,bold)
+			text(Vector2(976,698),"Sideways pull sets swing path",11,INK)
+			text(Vector2(976,716),"Trackpad: keep the click held",11,INK)
+		text(Vector2(976,742),"Past 100% = overswing penalty",10,INK)
 
 func _arrow(a: Vector2,b: Vector2,c: Color,width: float=1.0) -> void:
 	draw_line(a,b,c,width,true)
@@ -403,12 +439,13 @@ func _minimap(r: Rect2) -> void:
 				var z: float=-15-(game.course.length_m-15)*i/40.0
 				polygon.append(_map_point(Vector3(game.course.center_x(z)+side*(game.course.fairway_width(z)+cut),0,z),maprect))
 		draw_colored_polygon(polygon,Color("476c3d") if cut==14 else Color("719054") if cut==7 else Color("93b36a"))
-	for yards in range(100,int(game.course.length_m/game.YARD),100):
-		var p:=_map_point(Vector3(game.course.center_x(-yards*game.YARD),0,-yards*game.YARD),maprect)
+	for yards in range(100,Data.hole_yards(game.hole_index,game.round_tees),100):
+		var z: float=game.course.tee.z-yards*game.YARD
+		var p:=_map_point(Vector3(game.course.center_x(z),0,z),maprect)
 		draw_dashed_line(Vector2(maprect.position.x,p.y),Vector2(maprect.end.x,p.y),Color(0.9,0.9,0.7,0.18),1,3)
 		text(Vector2(maprect.end.x-24,p.y-3),str(yards),9,MUTED)
 	_map_ellipse(Vector4(game.course.pin.x,game.course.pin.z,game.course.green_radii.x,game.course.green_radii.y),maprect,Color("bed893"))
-	_map_ellipse(Vector4(0,0,8,5),maprect,Color("b9c98e"))
+	_map_ellipse(Vector4(game.course.tee.x,game.course.tee.z,8,5),maprect,Color("b9c98e"))
 	for e in game.course.bunkers: _map_ellipse(e,maprect,Color("e5d4ab"))
 	for e in game.course.ponds: _map_ellipse(e,maprect,Color("5aacae"))
 	var creek:=PackedVector2Array()
@@ -479,7 +516,7 @@ func _green_grid() -> void:
 			var q: Vector3=p+Vector3(1.6,0,0); q.y=game.course.height_at(q.x,q.z)+0.24
 			if not game.camera.is_position_behind(p) and not game.camera.is_position_behind(q):
 				var a: Vector2=game.camera.unproject_position(p); var b: Vector2=game.camera.unproject_position(q)
-				if a.y>110 and a.y<570: draw_line(a,b,Color(0.9,1,0.75,0.24),1,true)
+				if a.y>110 and a.y<570 and a.x>340 and b.x>340 and a.x<1010 and b.x<1010: draw_line(a,b,Color(0.9,1,0.75,0.24),1,true)
 	var p: Vector3=game.ball_pos
 	var slope:=Vector3(game.course.height_at(p.x-0.5,p.z)-game.course.height_at(p.x+0.5,p.z),0,game.course.height_at(p.x,p.z-0.5)-game.course.height_at(p.x,p.z+0.5))
 	var downhill: Vector3=p+slope.normalized()*3.0
@@ -495,15 +532,18 @@ func _green_grid() -> void:
 
 func _result() -> void:
 	buttons.clear()
-	panel(Rect2(350,290,580,222),INK,18,GOLD)
-	center(Rect2(368,313,544,27),"SHOT SERVED",12,GOLD,bold)
-	center(Rect2(363,350,554,43),game.result_title,22,CREAM,bold)
-	center(Rect2(365,399,550,30),game.result_detail,13,MUTED)
-	if game.record_notice!="": center(Rect2(365,425,550,22),game.record_notice,11,GOLD,bold)
+	panel(Rect2(350,275,580,273),INK,18,GOLD)
+	center(Rect2(368,291,544,27),"PRACTICE · SAME SHOT, FRESH BALL" if game.practice_active else "SHOT SERVED",12,GOLD,bold)
+	center(Rect2(363,326,554,43),game.result_title,22,CREAM,bold)
+	center(Rect2(365,375,550,30),game.result_detail,13,MUTED)
+	center(Rect2(365,411,550,26),game.shot_feedback(),14,CREAM,bold)
+	if game.record_notice!="": center(Rect2(365,447,550,22),game.record_notice,11,GOLD,bold)
+	elif game.practice_active:
+		for i in range(3): button(Rect2(408+i*158,443,148,29),["1 Putt","2 Chip","3 Pitch"][i],"station:%d"%i,game.practice_station==i)
 	if game.can_take_breakfast_ball():
-		button(Rect2(374,449,233,43),"PLAY IT    ↵","continue",false,true)
-		button(Rect2(619,449,287,43),"BREAKFAST BALL    B","breakfast")
-	else: button(Rect2(493,449,294,43),"CONTINUE    ↵","continue",false,true)
+		button(Rect2(374,487,233,43),"PLAY IT    ↵","continue",false,true)
+		button(Rect2(619,487,287,43),"BREAKFAST BALL    B","breakfast")
+	else: button(Rect2(493,487,294,43),"RETRY SHOT    ↵" if game.practice_active else "CONTINUE    ↵","continue",false,true)
 
 func _scorecard() -> void:
 	if game.mode==2:
@@ -514,7 +554,7 @@ func _scorecard() -> void:
 	panel(Rect2(95,148,1090,517),CREAM,18)
 	text(Vector2(130,196),"THE CLUBHOUSE" if game.state=="finished" else "THE SCORECARD",12,Color("647454"),bold)
 	text(Vector2(130,242),"Breakfast Balls.",38,INK,serif)
-	text(Vector2(755,231),"MAGNOLIA PINES  /  "+("STROKE" if game.mode==0 else "SKINS"),13,INK,bold)
+	text(Vector2(755,231),game.tee_name(game.round_tees).to_upper()+" / "+("STROKE" if game.mode==0 else "SKINS"),13,INK,bold)
 	var cell: float=43.0
 	var startx: float=329.0
 	panel(Rect2(122,267,1038,37),INK,5)
@@ -592,21 +632,23 @@ func _help() -> void:
 	panel(Rect2(228,70,824,665),CREAM,18)
 	text(Vector2(269,120),"THE BREAKFAST BALLS FIELD GUIDE",12,Color("6a775b"),bold)
 	text(Vector2(269,171),"A little touch goes a long way.",32,INK,serif)
+	button(Rect2(269,192,250,34),"Keyboard","input:0",game.input_style==0)
+	button(Rect2(533,192,330,34),"Mouse & Trackpad","input:1",game.input_style==1)
 	var rows: Array=[
-		["01  LINE IT UP", "Drag across the course or use ← / → to aim. V shows the hole."],
-		["02  PICK A CLUB", "Q / E, mouse wheel, or the bag buttons. Yardages show full carry."],
-		["03  MAKE YOUR SWING", "Pull down for power. Charging continues: past 100% loses contact."],
-		["04  SHAPE THE SHOT", "Sideways backswing sets PATH. Push up; time release on the face meter."],
-		["PATH + FACE", "Square face + right path draws; left path fades. Bad timing hooks / slices."],
-		["READ THE COURSE", "Wind, uphill lies, rough, sand, bounce and spin affect the result."],
-		["LIE MATTERS", "Putt power accounts for surfaces. Rough and sand speed up the face meter."],
-		["HOUSE RULES", "Farthest ball plays next. Water / OB: +1 and replay the shot."],
-		["KEYBOARD", "Hold SPACE for power, A / D for path; release when the face is centered."]
+		["LINE IT UP", "Drag the course or use ← / → to aim. V shows the whole hole."],
+		["CHOOSE YOUR SHOT", "Q / E selects clubs. Wedges: X cycles Full / Pitch / Chip."],
+		["BUILD POWER", "Hold SPACE. Power keeps building; past 100% loses contact." if game.input_style==0 else "Click near the TOP of the gold pad. Hold the click and pull down."],
+		["TIME CONTACT", "Release SPACE with the face needle centered. A / D adjusts path." if game.input_style==0 else "Return toward your start; release the click with the needle centered."],
+		["FIND YOUR TOUCH", "Pitch flies higher and stops sooner. Chip flies low and runs out."],
+		["READ THE DISTANCE", "Putter readouts use feet. Estimates are affected by break and hazards."],
+		["KEEP THE CHALLENGE", "Rough / sand speed up contact. Wind, slope and spin still matter."],
+		["PRACTICE & PLAY", "Practice: R retries; 1 / 2 / 3 switches shots. Rounds: water / OB +1."]
 	]
 	for i in range(rows.size()):
-		var y: float=213+i*48
+		var y: float=252+i*49
 		text(Vector2(269,y),rows[i][0],12,INK,bold)
 		text(Vector2(269,y+20),rows[i][1],14,Color("65735c"))
+	text(Vector2(269,653),"Mouse / trackpad: sideways pull sets path; power keeps charging while held.",12,Color("65735c"))
 	button(Rect2(715,674,295,40),"GOT IT. LET'S GOLF.","closehelp",false,true)
 
 func _input(event: InputEvent) -> void:
@@ -619,6 +661,16 @@ func _action(action: String) -> void:
 	var parts: PackedStringArray=action.split(":")
 	var value: int=int(parts[1]) if parts.size()>1 else 0
 	match parts[0]:
+		"settings":
+			if game.state=="menu": game.settings_open=true
+		"closesettings": game.settings_open=false
+		"input": game.set_input_style(value)
+		"tees": game.tees=clampi(value,0,1)
+		"recordtees": game.record_tees=clampi(value,0,1)
+		"shotstyle": game.set_shot_style(value)
+		"practice": game.start_practice()
+		"station": game.set_practice_station(value)
+		"retrypractice": game.retry_practice()
 		"players": game.player_count=value; game.active_slot=mini(game.active_slot,value-1); game.mode=0 if value==1 and game.mode==1 else game.mode
 		"mode": game.mode=value; game.player_count=maxi(2,game.player_count) if value==1 else game.player_count
 		"holes": game.round_length=value
@@ -627,7 +679,7 @@ func _action(action: String) -> void:
 		"golfer": game.roster[game.active_slot]=value
 		"play": game.begin_name_entry()
 		"confirmname": game._accept_name_entry()
-		"leaderboard": game.state="leaderboard"
+		"leaderboard": game.record_tees=game.tees; game.state="leaderboard"
 		"closeleaderboard": game.state="menu"
 		"help": game.help_open=true; game.dragging=false; game.keyboard_charge=false
 		"closehelp": game.help_open=false
@@ -638,9 +690,9 @@ func _action(action: String) -> void:
 		"closeparsec": game.parsec_setup_open=false
 		"club": game.change_club(value)
 		"selectclub":
-			if game.state=="aim" and not game.dragging: game.club=value; game._update_marker()
+			game.select_club(value)
 		"spin":
-			if game.state=="aim": game.spin=(game.spin+2)%3-1
+			if game.state=="aim" and not game.dragging and not game.keyboard_charge: game.spin=(game.spin+2)%3-1
 		"overview":
 			if game.state=="aim": game.overview=not game.overview
 		"continue": game.advance_turn()
@@ -648,10 +700,11 @@ func _action(action: String) -> void:
 		"retrychallenge":
 			if game.state=="finished" and game.mode==2: game.start_round()
 		"card":
-			if game.state=="aim": game.score_return="aim"; game.state="scorecard"
+			if game.state=="aim" and not game.practice_active:
+				game.dragging=false; game.keyboard_charge=false; game.score_return="aim"; game.state="scorecard"
 		"next": game.next_hole()
 		"pause":
 			if game.state in ["aim","flight","result"]: game.previous_state=game.state; game.state="pause"; game.dragging=false; game.keyboard_charge=false
 		"resume": game.state=game.previous_state
-		"menu": game.state="menu"; game.help_open=false; game.player_index=0
+		"menu": game.return_to_menu()
 	queue_redraw()

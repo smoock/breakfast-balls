@@ -1,4 +1,5 @@
 shader_type spatial;
+uniform vec4 tee_area = vec4(0,0,8,5);
 
 uniform float hole_length=400.0;
 uniform float route_x[5];
@@ -39,7 +40,7 @@ void fragment() {
  float putting=1.0-smoothstep(-0.10,0.10,gd);
  vec3 green_color=vec3(0.365,0.49,0.205)*(1.0+0.025*sin(p.x*1.05));
  grass=mix(grass,green_color,putting);
- float tee=1.0-smoothstep(-0.1,0.1,ellipse_distance(p,vec4(0,0,8,5)));
+ float tee=1.0-smoothstep(-0.1,0.1,ellipse_distance(p,tee_area));
  grass=mix(grass,vec3(0.34,0.46,0.18),tee);
  // Filter fine texture in screen space to prevent the old striped moire.
  float footprint=max(length(dFdx(p)),length(dFdy(p)));

@@ -81,7 +81,7 @@ func lie_at(p: Vector3) -> String:
 	for e in bunkers:
 		if in_ellipse(p, e): return "BUNKER"
 	if in_ellipse(p,Vector4(pin.x,pin.z,green_radii.x,green_radii.y)): return "GREEN"
-	if in_ellipse(p,Vector4(0,0,8,5)): return "TEE"
+	if in_ellipse(p,Vector4(tee.x,tee.z,8,5)): return "TEE"
 	if p.z < -15.0 and p.z > -length_m:
 		var edge: float=absf(p.x-center_x(p.z))-fairway_width(p.z)
 		if edge<0: return "FAIRWAY"
@@ -151,7 +151,7 @@ func body_prism(pos: Vector3, height: float, bottom: Vector2, top: Vector2, colo
 	st.generate_normals()
 	return mesh_node(st.commit(),material(color),pos,parent)
 
-func build(index: int) -> void:
+func build(index: int, tees: int=0) -> void:
 	for child in get_children():
 		remove_child(child)
 		child.queue_free()
@@ -168,7 +168,8 @@ func build(index: int) -> void:
 	creek_points.clear()
 	bunkers.clear()
 	trees.clear()
-	tee = ground_point(0, 0, 0.15)
+	var tee_z: float=-Data.CLUB_TEE_ADVANCE[index]*0.9144 if tees==1 else 0.0
+	tee = ground_point(center_x(tee_z),tee_z,0.15)
 	pin = ground_point(center_x(-length_m), -length_m, 0.1)
 	var layout: Dictionary=Layouts.HOLES[index]
 	green_radii=Vector2(layout.g[0],layout.g[1])
@@ -188,7 +189,7 @@ func build(index: int) -> void:
 	mesh_node(backdrop,material(Color("547449")),Vector3(0,-24,-length_m*0.5))
 	_build_ground()
 	for side in [-1,1]:
-		sphere(ground_point(side*5,0,0.20),0.18,Color("f4de97"))
+		sphere(ground_point(tee.x+side*5,tee.z,0.20),0.18,Color("f4de97"))
 	# A pin you can see from the fairway.
 	cylinder(pin + Vector3(0,2.2,0),0.055,4.4,Color("fff0be"))
 	var flagmesh := BoxMesh.new()
@@ -233,6 +234,7 @@ func _build_ground() -> void:
 	mat.set_shader_parameter("hole_length",length_m)
 	mat.set_shader_parameter("route_x",PackedFloat32Array(Layouts.HOLES[hole_index].x))
 	mat.set_shader_parameter("route_width",PackedFloat32Array(Layouts.HOLES[hole_index].w))
+	mat.set_shader_parameter("tee_area",Vector4(tee.x,tee.z,8,5))
 	mat.set_shader_parameter("green",Vector4(pin.x,pin.z,green_radii.x,green_radii.y))
 	_configure_turf(mat)
 	terrain_mesh=mesh_node(st.commit(),mat,Vector3.ZERO)
@@ -389,15 +391,15 @@ func _build_details() -> void:
 	_instances(blade,grasses,Color("859655"))
 	# Course furniture: a tee sign, ball washer, and a bench.
 	var sign:=BoxMesh.new(); sign.size=Vector3(1.4,0.9,0.12)
-	mesh_node(sign,material(Color("173d33")),ground_point(-8,2,1.25))
-	cylinder(ground_point(-8,2,0.6),0.06,1.2,Color("d3b582"))
-	var label:=Label3D.new(); label.text="%02d  /  PAR %d"%[hole_index+1,Data.HOLES[hole_index][1]]; label.font_size=48; label.pixel_size=0.0035; label.position=ground_point(-8,2.08,1.25); label.modulate=Color("f5dfaa"); add_child(label)
-	cylinder(ground_point(8,3,0.6),0.06,1.2,Color("344d43"))
-	sphere(ground_point(8,3,1.3),0.22,Color("dfc47f"))
+	mesh_node(sign,material(Color("173d33")),ground_point(tee.x-8,tee.z+2,1.25))
+	cylinder(ground_point(tee.x-8,tee.z+2,0.6),0.06,1.2,Color("d3b582"))
+	var label:=Label3D.new(); label.text="%02d  /  PAR %d"%[hole_index+1,Data.HOLES[hole_index][1]]; label.font_size=48; label.pixel_size=0.0035; label.position=ground_point(tee.x-8,tee.z+2.08,1.25); label.modulate=Color("f5dfaa"); add_child(label)
+	cylinder(ground_point(tee.x+8,tee.z+3,0.6),0.06,1.2,Color("344d43"))
+	sphere(ground_point(tee.x+8,tee.z+3,1.3),0.22,Color("dfc47f"))
 	for y in [0.5,1.0]:
 		var plank:=BoxMesh.new(); plank.size=Vector3(2.5,0.15,0.5)
-		mesh_node(plank,material(Color("a18a60")),ground_point(-11,5,y))
-	for x in [-12,-10]: cylinder(ground_point(x,5,0.25),0.07,0.5,Color("354f43"))
+		mesh_node(plank,material(Color("a18a60")),ground_point(tee.x-11,tee.z+5,y))
+	for x in [-12,-10]: cylinder(ground_point(tee.x+x,tee.z+5,0.25),0.07,0.5,Color("354f43"))
 
 func _build_flowers() -> void:
 	var groups: Array = [[],[],[]]

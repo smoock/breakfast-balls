@@ -1,5 +1,17 @@
 extends RefCounted
 
+# Shared carry scale, flight time, landing retention and animation amplitude.
+const SHOT_STYLES = [
+	{"name":"Full", "range":1.0, "hang":0.0, "landing":0.18, "swing":1.0},
+	{"name":"Pitch", "range":0.60, "hang":3.1, "landing":0.14, "swing":0.65},
+	{"name":"Chip", "range":0.24, "hang":1.55, "landing":0.26, "swing":0.32}
+]
+# Yards moved forward along the existing routing. All other starts stay intact.
+const CLUB_TEE_ADVANCE = [0,0,65,0,75,0,55,0,0,0,0,0,0,65,0,0,0,0]
+
+static func hole_yards(index: int, tees: int=0) -> int:
+	return HOLES[index][2] - (CLUB_TEE_ADVANCE[index] if tees==1 else 0)
+
 # Carry yards. Trackman 2023 tour averages (published May 2024) for woods/irons/PW.
 # 4H and specialty wedges are explicit gameplay estimates, not measured tour means.
 const CLUBS = [
