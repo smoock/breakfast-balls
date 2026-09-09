@@ -2,6 +2,8 @@
 
 A playable native Godot 4.7 golf prototype: local hot-seat golf, playful golfers, tour-scale distances, and an original 18-hole par-72 course called **Magnolia Pines**. No account, network connection, or downloaded assets are required to play.
 
+Download the [Mac and Windows playtest builds](https://github.com/smoock/breakfast-balls/releases/latest). No Godot or Blender installation is needed to play.
+
 ## Play
 
 Open `project.godot` in Godot and press **F6** with the main scene open, or **F5** to run the project. Choose 1–4 players, each golfer, Stroke Play or Skins, and a 3-, 9-, or 18-hole round. Three-hole rounds draw three distinct random holes in random order. Nine-hole rounds offer Front 9 (1–9) or Back 9 (10–18). All eight golfers have identical gameplay stats.
@@ -105,4 +107,4 @@ Main scene: `game/main.tscn`. Gameplay and input: `game/main.gd`. Shared course 
 
 Run automated checks with `godot --headless --path . --script res://tests/golf_tests.gd`. These cover input events, settling shots, a real short putt, penalties, player separation, Skins carryovers, pause, and 18-hole scoring progression. Full-round scoring tests inject hole scores; they are not a claim that every hole has been manually played. Visual QA: `godot --path . -- --qa --qa-play --qa-exit` saves a screenshot in `/private/tmp/breakfast-balls-qa.png`. Use `--qa-calibration` for remote timing or `--qa-parsec` for the Parsec setup card.
 
-This first version does not include saved rounds, gamepad support, authored character animations, tournament-accurate rules, or a packaged standalone app. Playtesting should guide the next pass on swing feel, difficulty, camera and art.
+This first version does not include saved rounds, gamepad support, authored character animations, or tournament-accurate rules. Playtesting should guide the next pass on swing feel, difficulty, camera and art.
