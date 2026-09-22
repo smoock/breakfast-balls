@@ -1,0 +1,53 @@
+{
+  "game": "Breakfast Balls",
+  "engine": "4.7.2.stable.official.ed1daf0bf",
+  "threads": false,
+  "renderer": "WebGL 2 / Compatibility",
+  "files": {
+    ".nojekyll": {
+      "bytes": 0,
+      "gzip_bytes": 20,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "index.audio.position.worklet.js": {
+      "bytes": 2973,
+      "gzip_bytes": 1161,
+      "sha256": "be33985bc7160d6bf9646f259cd86b259cd67b02ccb297ee5c44f8ac84327bc8"
+    },
+    "index.audio.worklet.js": {
+      "bytes": 7298,
+      "gzip_bytes": 2194,
+      "sha256": "5b476a9c9ce642c0ee4256436d1bc31d9c38f868aca0f9a8e2a57c18d2dec2a3"
+    },
+    "index.html": {
+      "bytes": 27419,
+      "gzip_bytes": 8739,
+      "sha256": "48799f552dcd7e28e523d56c306f70149312823d0647a04bff6bfd98dca07363"
+    },
+    "index.js": {
+      "bytes": 279815,
+      "gzip_bytes": 68471,
+      "sha256": "33c94cb3175f3333b82e2a3be5e8e86f77986f0aa2042b1631f6367a4e5bb6ba"
+    },
+    "index.pck": {
+      "bytes": 6026120,
+      "gzip_bytes": 5972673,
+      "sha256": "c04b17f2e1f772c6450d18c9906aac53b6c01ae4c8062d1f62be6659f7e4b777"
+    },
+    "index.png": {
+      "bytes": 21443,
+      "gzip_bytes": 19328,
+      "sha256": "3cb4495c0b98dfbe4b663cbf2b6836473572339beb66d902367893162a70be0e"
+    },
+    "index.wasm": {
+      "bytes": 39514754,
+      "gzip_bytes": 10054758,
+      "sha256": "fc74679e3b97f76878947fcd4fbe1268cbfa6188182a2e33bbc3f5dc9bfa57d0"
+    },
+    "third-party-notices.txt": {
+      "bytes": 115785,
+      "gzip_bytes": 30831,
+      "sha256": "ae0e4017d55d7d27a9248a94c84caac5586c4caba5d4778ddaf3a33de856b38c"
+    }
+  }
+}

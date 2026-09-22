@@ -1,0 +1,345 @@
+<!DOCTYPE html>
+<html lang="en" data-game-state="idle">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#173e32">
+  <meta name="description" content="Good swings. Bad puns. Great mornings. Play Breakfast Balls, a local 1–4 player golf game, right in your browser.">
+  <title>Breakfast Balls · The Early Bird Golf Club</title>
+  <style>
+    :root { color-scheme: light; --cream: #f7f1dd; --paper: #fffbee; --green: #173e32; --muted: #577062; --gold: #edc56c; --line: #d8d9bf; }
+    * { box-sizing: border-box; }
+    body { margin: 0; background: var(--cream); color: var(--green); font: 15px/1.55 system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
+    button, summary { font: inherit; }
+    button { cursor: pointer; }
+    button:disabled { cursor: wait; }
+    button, a { -webkit-tap-highlight-color: transparent; }
+    button:focus-visible, a:focus-visible, summary:focus-visible { outline: 3px solid #ab6d16; outline-offset: 4px; }
+    [hidden] { display: none !important; }
+    .app { min-height: 100svh; display: flex; flex-direction: column; }
+    .topbar { min-height: 82px; display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 14px 0; width: min(1280px, calc(100% - 64px)); margin: 0 auto; }
+    .brand { display: flex; align-items: center; gap: 13px; }
+    .brand-mark { width: 39px; height: 39px; border: 1px solid currentColor; border-radius: 50%; display: grid; place-items: center; font: bold 19px Georgia, serif; letter-spacing: -2px; padding-right: 3px; }
+    .eyebrow { font-size: 10px; font-weight: 750; letter-spacing: .15em; text-transform: uppercase; }
+    .brand-name { font-size: 12px; font-weight: 750; letter-spacing: .055em; }
+    .brand-caption { display: block; font-size: 10px; color: var(--muted); letter-spacing: .11em; }
+    .toolbar { display: flex; align-items: center; gap: 8px; }
+    .pill { border: 1px solid #b8c5ae; border-radius: 99px; padding: 6px 12px; font-size: 10px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; white-space: nowrap; }
+    .text-button { border: 1px solid #b8c5ae; border-radius: 7px; background: transparent; color: var(--green); padding: 7px 12px; font-size: 12px; font-weight: 650; white-space: nowrap; }
+    .text-button:hover { background: #e9e8d2; }
+    main { flex: 1; display: grid; place-items: center; padding: 0 32px; }
+    .stage { width: 100%; max-width: 1280px; position: relative; border-radius: 14px; overflow: hidden; background: var(--green); box-shadow: 0 20px 55px #14362a12; }
+    #canvas { position: absolute; display: block; width: 100%; height: 100%; touch-action: none; visibility: hidden; }
+    #canvas:focus { outline: none; }
+    #canvas:focus-visible { outline: 3px solid var(--gold); outline-offset: -3px; }
+    .landing { min-height: 630px; display: grid; grid-template-columns: 1fr 1fr; }
+    .intro { display: flex; flex-direction: column; justify-content: center; align-items: flex-start; padding: 60px 60px 48px; color: var(--cream); position: relative; z-index: 1; }
+    .intro .eyebrow { color: var(--gold); }
+    h1 { font: 700 clamp(55px, 6.8vw, 92px)/.91 Georgia, "Times New Roman", serif; letter-spacing: -.055em; margin: 26px 0 22px; }
+    .tagline { font-size: 16px; color: #f2efd9; margin: 0; }
+    .description { max-width: 340px; font-size: 14px; color: #b9cfbb; margin: 18px 0 30px; }
+    .primary { display: inline-flex; align-items: center; justify-content: space-between; gap: 40px; min-width: 246px; min-height: 54px; border: 0; border-radius: 8px; padding: 14px 20px; background: var(--gold); color: #143e31; font-weight: 800; font-size: 14px; box-shadow: 0 4px 0 #102e2633; }
+    .primary:hover { background: #f7d68a; }
+    .primary:disabled { opacity: .65; }
+    .primary .arrow { font-size: 21px; font-weight: 400; line-height: 1; }
+    .under-button { margin: 14px 0 0; color: #bdcfc0; font-size: 11px; }
+    .under-button strong { color: #edf0d9; font-weight: 500; }
+    .illustration { position: relative; min-width: 0; background: #c8d9b2; display: flex; flex-direction: column; justify-content: flex-end; overflow: hidden; }
+    .illustration::after { content: ""; position: absolute; inset: 65% 0 0; background: linear-gradient(transparent, #dce3bcd9 75%, #dce3bc); pointer-events: none; }
+    .course-art { position: absolute; width: 100%; height: 100%; inset: 0; }
+    .course-label { position: absolute; top: 34px; left: 34px; right: 34px; display: flex; justify-content: space-between; align-items: start; border-top: 1px solid #244d3840; padding-top: 13px; z-index: 1; }
+    .course-label .number { font: 36px/1 Georgia, serif; letter-spacing: -.045em; }
+    .course-label .number small { font: 10px/1.6 system-ui, sans-serif; letter-spacing: .05em; display: block; text-align: right; margin-top: 3px; }
+    .art-caption { position: relative; z-index: 1; margin: 0 34px 32px; display: flex; justify-content: space-between; align-items: end; gap: 18px; }
+    .art-caption p { margin: 3px 0 0; max-width: 210px; font: 25px/1.15 Georgia, serif; letter-spacing: -.025em; }
+    .stamp { width: 81px; height: 81px; flex-shrink: 0; border: 1px solid #244d3860; border-radius: 50%; display: grid; align-content: center; text-align: center; font: italic 18px/1.1 Georgia, serif; transform: rotate(-12deg); }
+    .stamp span { font: 8px/1.8 system-ui, sans-serif; text-transform: uppercase; letter-spacing: .08em; }
+    .loading { width: 100%; max-width: 320px; }
+    .loading p { margin: 0 0 9px; color: var(--cream); font-size: 14px; font-weight: 600; }
+    progress { display: block; border: 0; border-radius: 6px; overflow: hidden; width: 100%; height: 6px; accent-color: var(--gold); background: #426354; }
+    progress::-webkit-progress-bar { background: #426354; border-radius: 6px; }
+    progress::-webkit-progress-value { background: var(--gold); border-radius: 6px; }
+    progress::-moz-progress-bar { background: var(--gold); }
+    .load-detail { min-height: 22px; display: block; margin-top: 9px; color: #c0d2c1; font-size: 11px; }
+    .error { max-width: 360px; margin-bottom: 15px; color: #fff1d8; font-size: 13px; }
+    .error strong { display: block; margin-bottom: 5px; color: var(--gold); font-size: 16px; }
+    .error p { margin: 0; }
+    .footer { width: min(1280px, calc(100% - 64px)); margin: 20px auto 22px; display: flex; justify-content: space-between; align-items: start; gap: 22px; color: var(--muted); font-size: 11px; }
+    .footer p { margin: 0; }
+    .footer a { color: inherit; text-underline-offset: 3px; }
+    .footer .save-note { max-width: 430px; text-align: right; }
+    .desktop-note { display: none; margin-top: 6px; font-weight: 650; }
+    .sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0,0,0,0); white-space: nowrap; border: 0; }
+    .noscript { padding: 15px 20px; background: var(--gold); color: var(--green); text-align: center; }
+    dialog { width: min(560px, calc(100% - 32px)); border: 1px solid var(--line); border-radius: 14px; padding: 30px; background: var(--paper); color: var(--green); box-shadow: 0 20px 90px #102e2640; }
+    dialog::backdrop { background: #102e26a6; }
+    dialog h2 { margin: 3px 0 8px; font: 34px/1.1 Georgia, serif; letter-spacing: -.04em; }
+    dialog .lead { color: var(--muted); font-size: 13px; margin: 10px 0 18px; }
+    .dialog-head { display: flex; justify-content: space-between; align-items: start; gap: 20px; }
+    .close-button { flex-shrink: 0; padding: 5px 11px; }
+    .control-list { margin: 20px 0; }
+    .control-list > div { display: grid; grid-template-columns: 145px 1fr; gap: 16px; border-top: 1px solid var(--line); padding: 10px 0; font-size: 13px; }
+    .control-list dt { font-weight: 700; }
+    .control-list dd { margin: 0; color: var(--muted); }
+    kbd { font: 600 11px system-ui, sans-serif; background: #eeeedc; border: 1px solid #c8cfb8; border-radius: 4px; padding: 2px 5px; color: var(--green); white-space: nowrap; }
+    .dialog-note { font-size: 12px; color: var(--muted); }
+    html[data-game-state="playing"] body { background: #102e26; }
+    html[data-game-state="playing"] .topbar { min-height: 58px; padding-top: 8px; padding-bottom: 8px; color: var(--cream); }
+    html[data-game-state="playing"] .brand-caption { color: #adc4b5; }
+    html[data-game-state="playing"] .text-button { color: var(--cream); border-color: #516b5c; }
+    html[data-game-state="playing"] .text-button:hover { background: #315345; }
+    html[data-game-state="playing"] main { align-content: center; padding: 0 16px; }
+    html[data-game-state="playing"] .stage { width: min(1280px, calc((100svh - 110px) * 1.6), calc(100vw - 32px)); aspect-ratio: 1.6; border-radius: 5px; box-shadow: none; }
+    html[data-game-state="playing"] #canvas { visibility: visible; }
+    html[data-game-state="playing"] .footer { margin: 12px auto 16px; color: #adc4b5; }
+    html[data-game-state="playing"] .footer .save-note, html[data-game-state="playing"] .pill { display: none; }
+    @media (min-width: 1600px) { .landing { min-height: 710px; } }
+    @media (max-width: 950px) { .intro { padding: 45px 32px; } .landing { min-height: 540px; } .art-caption, .course-label { margin-left: 24px; margin-right: 24px; } .course-label { left: 0; right: 0; } .art-caption p { font-size: 22px; } .stamp { width: 64px; height: 64px; font-size: 15px; } }
+    @media (max-width: 680px) { .topbar { min-height: 70px; width: calc(100% - 32px); gap: 8px; } .brand { gap: 9px; } .brand-name { font-size: 10px; } .brand-caption { font-size: 8px; } .brand-mark { width: 33px; height: 33px; } .pill { display: none; } main { padding: 0 16px; } .landing { grid-template-columns: 1fr; min-height: 0; } .intro { padding: 36px 28px 38px; } h1 { font-size: 66px; margin-top: 22px; } .description { margin-bottom: 25px; } .illustration { min-height: 240px; } .course-art { height: 420px; top: -88px; } .course-label { top: 19px; } .art-caption { margin-bottom: 20px; } .art-caption p { font-size: 22px; } .footer { width: calc(100% - 32px); flex-direction: column; gap: 12px; } .footer .save-note { text-align: left; } .desktop-note { display: block; } .text-button { font-size: 11px; padding: 7px 9px; } .toolbar { gap: 6px; } html[data-game-state="playing"] .brand-caption { display: none; } html[data-game-state="playing"] .brand-name { display: none; } html[data-game-state="playing"] .stage { width: min(1280px, calc((100svh - 112px) * 1.6), calc(100vw - 32px)); } html[data-game-state="playing"] .footer { margin-top: 10px; } .control-list > div { grid-template-columns: 115px 1fr; gap: 10px; } dialog { padding: 24px; } }
+    @media (prefers-reduced-motion: no-preference) { button { transition: background-color .15s; } }
+  </style>
+  
+  <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='15' fill='%23173e32'/%3E%3Ctext x='31' y='41' fill='%23f7f1dd' text-anchor='middle' font-family='Georgia,serif' font-weight='bold' font-size='26' letter-spacing='-3'%3EBB.%3C/text%3E%3C/svg%3E">
+</head>
+<body>
+  <noscript><div class="noscript">Breakfast Balls needs JavaScript to play. Enable JavaScript in your browser, then reload this page.</div></noscript>
+  <div class="app" id="app">
+    <header class="topbar">
+      <div class="brand" aria-label="The Early Bird Golf Club">
+        <span class="brand-mark" aria-hidden="true">BB.</span>
+        <div><span class="brand-name">THE EARLY BIRD GOLF CLUB</span><span class="brand-caption">GOOD MORNINGS START HERE.</span></div>
+      </div>
+      <nav class="toolbar" aria-label="Game tools">
+        <span class="pill">Browser edition</span>
+        <button class="text-button" id="resume" hidden>Back to game</button>
+        <button class="text-button" id="controls" aria-haspopup="dialog" hidden>Controls</button>
+        <button class="text-button" id="fullscreen" hidden>Full screen ↗</button>
+      </nav>
+    </header>
+    <main>
+      <section class="stage" id="stage" aria-label="Breakfast Balls game">
+        <canvas id="canvas" width="1280" height="800" tabindex="0" aria-label="Breakfast Balls golf game" aria-describedby="canvas-instructions">Your browser needs canvas support to play Breakfast Balls.</canvas>
+        <span class="sr-only" id="canvas-instructions">Use the arrow keys to aim, Q and E to change clubs, and hold Space then release to swing. Tab opens the scorecard. Escape pauses. Shift plus Tab leaves the game and moves to the page controls.</span>
+        <div class="landing" id="landing">
+          <div class="intro">
+            <div class="eyebrow">Your morning tee time awaits</div>
+            <h1>Breakfast<br>Balls.</h1>
+            <p class="tagline">Good swings. Bad puns. Great mornings.</p>
+            <p class="description">Meet your foursome at Magnolia Pines. Eighteen holes, a little friendly competition, and a fresh start off the first tee.</p>
+            <div class="error" id="error" role="alert" hidden><strong id="error-title">A little delay at the first tee.</strong><p id="error-message"></p></div>
+            <button class="primary" id="play" disabled><span id="play-label">Play in browser</span><span class="arrow" aria-hidden="true">→</span></button>
+            <div class="loading" id="loading" hidden>
+              <p id="load-label">Opening the clubhouse…</p>
+              <progress id="progress" aria-label="Loading Breakfast Balls"></progress>
+              <span class="load-detail" id="load-detail">The first visit takes a moment.</span>
+            </div>
+            <p class="under-button" id="launch-note"><strong>1–4 players · Same-device play</strong><br>Keyboard + mouse or trackpad. No account needed.</p>
+          </div>
+          <div class="illustration" aria-hidden="true">
+            <div class="course-label"><div class="eyebrow">Magnolia Pines<br><span style="font-weight:400;letter-spacing:.06em">A little slice of the good life.</span></div><div class="number">18<small>HOLES / PAR 72</small></div></div>
+            <svg class="course-art" viewBox="0 0 620 680" preserveAspectRatio="xMidYMid slice" xmlns="http://www.w3.org/2000/svg">
+              <defs><linearGradient id="sky" x2="0" y2="1"><stop stop-color="#dce4c6"/><stop offset="1" stop-color="#aec99a"/></linearGradient><linearGradient id="fairway" x2="0" y2="1"><stop stop-color="#9ab879"/><stop offset="1" stop-color="#74925b"/></linearGradient><pattern id="grass" width="38" height="38" patternUnits="userSpaceOnUse" patternTransform="rotate(20)"><path d="M0 0v38" stroke="#f4f1c3" stroke-opacity=".065" stroke-width="18"/></pattern></defs>
+              <path fill="url(#sky)" d="M0 0h620v680H0z"/><circle cx="442" cy="177" r="64" fill="#f4e6a6"/>
+              <path d="M-30 331Q90 236 246 289T660 270V680H-30" fill="#9ab398"/><path d="M-30 381Q176 266 355 344T660 323V680H-30" fill="#77977a"/>
+              <g fill="#4f7660"><path d="m44 325 29-148 28 148-17-8 22 45H41l23-46z"/><path d="m101 331 20-114 25 114-15-9 22 45h-66l25-46z"/><path d="m505 329 27-157 31 157-18-8 24 54h-76l27-54z"/><path d="m562 338 27-124 26 124-18-7 20 42h-63l26-42z"/></g>
+              <path d="M-45 680V433Q71 349 279 382T658 383V680" fill="url(#fairway)"/>
+              <path d="M-25 621Q137 497 279 471T426 377Q476 374 492 400Q481 470 377 530T278 710" fill="#b2c989"/>
+              <path d="M-25 621Q137 497 279 471T426 377Q476 374 492 400Q481 470 377 530T278 710" fill="url(#grass)"/>
+              <path d="M376 490c-71-18-19-62 22-57 31 4 47 10 55 32 10 29-35 36-77 25" fill="#dbd6a4"/><path d="M384 483c-55-14-17-43 17-38 25 3 37 8 42 23 7 17-25 25-59 15" fill="#f5edc9"/>
+              <ellipse cx="267" cy="466" rx="141" ry="58" fill="#577648" opacity=".35"/><ellipse cx="258" cy="453" rx="141" ry="58" fill="#cbdc8e"/><ellipse cx="258" cy="452" rx="134" ry="51" fill="url(#grass)"/>
+              <ellipse cx="300" cy="451" rx="11" ry="4" fill="#34553f"/><path d="m302 446 57 12" stroke="#647b4c" stroke-width="3" opacity=".5"/><path d="M300 451V259" stroke="#fdf6d8" stroke-width="4"/><path d="M302 258v68l85-34z" fill="#b95840"/><path d="m302 258 85 34-53-4z" fill="#d5744f"/>
+              <path d="M-20 672q75-141 168-101t54 109M504 683q-20-113 72-139t70 74" fill="#42694e"/>
+              <g fill="#e2b49f"><circle cx="92" cy="586" r="7"/><circle cx="110" cy="577" r="6"/><circle cx="125" cy="587" r="8"/><circle cx="144" cy="595" r="6"/><circle cx="563" cy="573" r="7"/><circle cx="579" cy="565" r="5"/><circle cx="592" cy="571" r="6"/></g>
+              <ellipse cx="214" cy="531" rx="21" ry="7" fill="#476c43" opacity=".3"/><circle cx="207" cy="515" r="17" fill="#fffbea"/><path d="m203 506 4 1m-11 5 3 1m13 0 3 1m-12 6 3 1m-10 3 3 1m13-2 3 1" stroke="#d8dbc1" stroke-width="2.4" stroke-linecap="round"/>
+            </svg>
+            <div class="art-caption"><div><span class="eyebrow">The house rule</span><p>Everyone deserves<br>a breakfast ball.</p></div><div class="stamp"><span>Served daily</span>Fresh<br>fairways<span>Early Bird G.C.</span></div></div>
+          </div>
+        </div>
+      </section>
+    </main>
+    <footer class="footer">
+      <p id="footer-hint">Made for a leisurely round on your desktop.<span class="desktop-note">For the full game, use a computer with a keyboard and mouse.</span></p>
+      <p class="save-note">Swing guidance and club records are saved in this browser. Private browsing or clearing site data can erase them. Rounds are not saved. <a href="third-party-notices.txt" target="_blank" rel="noopener">Credits</a></p>
+    </footer>
+  </div>
+  <dialog id="help" aria-labelledby="help-title">
+    <div class="dialog-head"><div><div class="eyebrow">A quick warm-up</div><h2 id="help-title">Find your swing.</h2></div><button id="close-help" class="text-button close-button" aria-label="Close controls">Close</button></div>
+    <p class="lead">Click the game to give it keyboard focus. In a round, press Escape to pause. Start with Short-game practice in the clubhouse to get a feel for it.</p>
+    <dl class="control-list">
+      <div><dt><kbd>←</kbd> <kbd>→</kbd></dt><dd>Aim, or drag across the course.</dd></div>
+      <div><dt><kbd>Q</kbd> / <kbd>E</kbd></dt><dd>Change clubs. The mouse wheel works too.</dd></div>
+      <div><dt>Hold <kbd>Space</kbd></dt><dd>Build power. Release when the moving face needle is in the green center zone. <kbd>A</kbd> / <kbd>D</kbd> shape the path.</dd></div>
+      <div><dt>Mouse / trackpad</dt><dd>Hold near the top of the gold swing pad, pull down, then push forward and release.</dd></div>
+      <div><dt><kbd>Enter</kbd></dt><dd>Continue after a shot. <kbd>B</kbd> takes your opening Breakfast Ball when offered.</dd></div>
+      <div><dt><kbd>Tab</kbd> / <kbd>V</kbd></dt><dd>Scorecard / whole-hole view.</dd></div>
+      <div><dt><kbd>H</kbd> / <kbd>Esc</kbd></dt><dd>In-game help / pause.</dd></div>
+    </dl>
+    <p class="dialog-note"><kbd>Shift</kbd> + <kbd>Tab</kbd> moves from the game to these page controls. Full screen is optional. Click inside the game to enable sound; adjust it in the game's Settings.</p>
+  </dialog>
+  <div class="sr-only" id="announcement" role="status" aria-live="polite"></div>
+  <script>
+    (() => {
+      'use strict';
+      const config = {"args":[],"canvasResizePolicy":0,"emscriptenPoolSize":8,"ensureCrossOriginIsolationHeaders":true,"executable":"index","experimentalVK":false,"fileSizes":{"index.pck":6026120,"index.wasm":39514754},"focusCanvas":false,"gdextensionLibs":[],"godotPoolSize":4};
+      const threadsEnabled = false;
+      const byId = (id) => document.getElementById(id);
+      const canvas = byId('canvas');
+      const play = byId('play');
+      const help = byId('help');
+      let state = 'idle';
+      let loadTimer;
+      let stalledTimer;
+      let lastDownloadedBytes = 0;
+
+      function watchProgress() {
+        clearTimeout(stalledTimer);
+        stalledTimer = setTimeout(() => {
+          fail('Loading stopped making progress. Check your connection, then reload the game.');
+        }, 90000);
+      }
+
+      function setState(next) {
+        state = next;
+        document.documentElement.dataset.gameState = next;
+      }
+
+      function fail(message, title = 'A little delay at the first tee.') {
+        clearTimeout(loadTimer);
+        clearTimeout(stalledTimer);
+        setState('error');
+        byId('error-title').textContent = title;
+        byId('error-message').textContent = message;
+        byId('error').hidden = false;
+        byId('loading').hidden = true;
+        byId('landing').hidden = false;
+        byId('resume').hidden = true;
+        play.hidden = false;
+        play.disabled = false;
+        byId('play-label').textContent = 'Try again';
+        byId('launch-note').textContent = 'A reload gives the game a fresh start.';
+      }
+
+      function loadEngineScript() {
+        return new Promise((resolve, reject) => {
+          const script = document.createElement('script');
+          script.src = 'index.js';
+          script.onload = resolve;
+          script.onerror = () => reject(new Error('The game could not download. Check your connection, then try again.'));
+          document.head.appendChild(script);
+        });
+      }
+
+      function checkBrowser() {
+        if (location.protocol === 'file:') throw new Error('Open the hosted game link. This game cannot run by opening the HTML file directly.');
+        if (!window.isSecureContext) throw new Error('Use the HTTPS version of this page. Local development also works on localhost.');
+        if (!('WebAssembly' in window)) throw new Error('This browser cannot run the game. Try an up-to-date desktop browser with WebAssembly support.');
+        const testCanvas = document.createElement('canvas');
+        const gl = testCanvas.getContext('webgl2');
+        if (!gl) throw new Error('WebGL 2 is unavailable. Enable hardware acceleration in your browser, or try an up-to-date desktop browser.');
+        const release = gl.getExtension('WEBGL_lose_context');
+        if (release) release.loseContext();
+      }
+
+      async function start() {
+        if (state === 'error') { location.reload(); return; }
+        if (state !== 'idle') return;
+        try {
+          checkBrowser();
+          setState('loading');
+          play.hidden = true;
+          byId('loading').hidden = false;
+          byId('launch-note').textContent = 'A fresh course is on its way. Keep this tab open.';
+          byId('announcement').textContent = 'Loading Breakfast Balls.';
+          watchProgress();
+          loadTimer = setTimeout(() => {
+            byId('load-detail').textContent = 'Still loading. A first visit can take longer on a slow connection.';
+          }, 20000);
+          await loadEngineScript();
+          const missing = Engine.getMissingFeatures({ threads: threadsEnabled });
+          if (missing.length) throw new Error('This browser is missing a game requirement: ' + missing.join('; '));
+          const engine = new Engine({ ...config, canvas, canvasResizePolicy: 0, focusCanvas: false });
+          window.__breakfastEngine = engine;
+          await engine.startGame({
+            onProgress(current, total) {
+              if (state !== 'loading') return;
+              if (current > lastDownloadedBytes) {
+                lastDownloadedBytes = current;
+                watchProgress();
+              }
+              if (current > 0 && total > 0) {
+                byId('progress').max = total;
+                byId('progress').value = current;
+                const percent = Math.min(100, Math.round(current / total * 100));
+                byId('load-label').textContent = percent === 100 ? 'Setting up the first tee…' : 'Opening the clubhouse… ' + percent + '%';
+                byId('load-detail').textContent = (current / 1048576).toFixed(1) + ' / ' + (total / 1048576).toFixed(1) + ' MB';
+              } else {
+                byId('progress').removeAttribute('value');
+                byId('load-label').textContent = 'Setting up the first tee…';
+              }
+            },
+            onExit(code) { fail(code ? 'The game stopped unexpectedly. Reload to begin a new round.' : 'Thanks for playing. Reload for another round.', 'See you on the first tee.'); },
+          });
+          if (state === 'error') return;
+          clearTimeout(loadTimer);
+          clearTimeout(stalledTimer);
+          byId('loading').hidden = true;
+          enterGame();
+        } catch (error) {
+          console.error('Breakfast Balls launch:', error);
+          fail(error instanceof Error ? error.message : 'The game could not start. Reload the page to try again.');
+        }
+      }
+
+      function enterGame() {
+        setState('playing');
+        byId('landing').hidden = true;
+        byId('resume').hidden = false;
+        byId('footer-hint').textContent = 'Click the game to play · H for help · Esc to pause · Shift + Tab for page controls';
+        byId('announcement').textContent = 'Game ready. Keyboard focus is in the game.';
+        canvas.focus({ preventScroll: true });
+      }
+
+      play.addEventListener('click', start);
+      byId('resume').addEventListener('click', () => canvas.focus({ preventScroll: true }));
+      byId('controls').addEventListener('click', () => help.showModal());
+      byId('close-help').addEventListener('click', () => help.close());
+      help.addEventListener('close', () => byId('controls').focus({ preventScroll: true }));
+      byId('fullscreen').addEventListener('click', async () => {
+        try {
+          if (document.fullscreenElement) await document.exitFullscreen();
+          else await byId('app').requestFullscreen();
+          if (state === 'playing') canvas.focus({ preventScroll: true });
+        } catch (error) {
+          byId('announcement').textContent = 'Full screen is unavailable in this browser. You can keep playing in the page.';
+        }
+      });
+      document.addEventListener('fullscreenchange', () => {
+        byId('fullscreen').textContent = document.fullscreenElement ? 'Exit full screen ↙' : 'Full screen ↗';
+      });
+      canvas.addEventListener('pointerdown', () => canvas.focus({ preventScroll: true }));
+      canvas.addEventListener('contextmenu', (event) => event.preventDefault());
+      canvas.addEventListener('webglcontextlost', (event) => {
+        event.preventDefault();
+        fail('The browser lost its connection to the graphics device. Reload to start a new round.', 'The course needs a fresh start.');
+      });
+
+      // Let plain Tab reach Godot's scorecard while providing a documented way
+      // back to HTML controls. Only suppress page scrolling when the canvas owns focus.
+      window.addEventListener('keydown', (event) => {
+        if (event.target !== canvas) return;
+        if (event.key === 'Tab' && event.shiftKey) {
+          event.preventDefault();
+          event.stopImmediatePropagation();
+          byId('controls').focus({ preventScroll: true });
+        } else if (['Tab', ' ', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(event.key)) {
+          event.preventDefault();
+        }
+      }, true);
+      play.disabled = false;
+      byId('controls').hidden = false;
+      byId('fullscreen').hidden = !document.fullscreenEnabled;
+    })();
+  </script>
+</body>
+</html>
+
