@@ -3,5 +3,7 @@
 .DS_Store
 /builds/
 /node_modules/
+.env
+.env.*
 /test-results/
 __pycache__/

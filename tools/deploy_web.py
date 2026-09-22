@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Publish the verified static build to its separate Vercel project."""
+"""Publish the verified browser build and private-room API to Vercel."""
 import argparse
 import hashlib
 import json
@@ -34,17 +34,33 @@ def main():
     target.mkdir(parents=True, exist_ok=True)
     # Keep only Vercel's project-link metadata between publications.
     for path in target.iterdir():
-        if path.name in (".vercel", ".gitignore", ".env.local", ".vercelignore"):
+        if path.name in (".vercel", ".gitignore", ".env.local", ".vercelignore", ".agents", "skills-lock.json"):
             continue
-        if path.name not in GENERATED_NAMES | {"vercel.json"} or not path.is_file():
+        if path.name in ("public", "api", "server") and path.is_dir():
+            continue
+        if path.name not in GENERATED_NAMES | {"vercel.json", "package.json"} or not path.is_file():
             raise SystemExit(f"Unexpected deployment file: {path}. Remove it manually or use a fresh builds/vercel directory.")
     for path in target.iterdir():
-        if path.is_file() and path.name != ".gitignore":
+        if path.is_file() and path.name not in (".gitignore", "skills-lock.json"):
             path.unlink()
+    for name in ("public", "api", "server"):
+        folder = target / name
+        if folder.exists():
+            shutil.rmtree(folder)
+        folder.mkdir()
     for name in names:
-        shutil.copy2(source / name, target / name)
+        shutil.copy2(source / name, target / "public" / name)
+    shutil.copy2(ROOT / "api/room.js", target / "api/room.js")
+    for path in (ROOT / "server").glob("*.mjs"):
+        shutil.copy2(path, target / "server" / path.name)
+    for path in (ROOT / "server").glob("*.js"):
+        shutil.copy2(path, target / "server" / path.name)
+    (target / "package.json").write_text(json.dumps({
+        "name": "breakfast-balls-online", "private": True, "type": "module",
+        "engines": {"node": "22.x"}
+    }, indent=2) + "\n")
     shutil.copy2(ROOT / "web/vercel.json", target / "vercel.json")
-    (target / ".vercelignore").write_text(".vercel\n.env*\n.gitignore\n")
+    (target / ".vercelignore").write_text(".vercel\n.env*\n.gitignore\n.agents\nskills-lock.json\n")
     print(f"Verified {len(names)} build files. Staged in {target}", flush=True)
     if args.prepare_only:
         return
@@ -57,7 +73,7 @@ def main():
         raise SystemExit("Vercel CLI 47.2.2+ is required. Use a current CLI with --vercel, or run the pinned npx command in WEB.md.")
     subprocess.run([cli, "link", "--yes", "--project", args.project, "--scope", args.scope], cwd=target, check=True)
     # Current CLI versions download development credentials when linking. This
-    # static site needs none; keep them out of every subsequent publication.
+    # production API receives its secrets from Vercel, never uploaded files.
     (target / ".env.local").unlink(missing_ok=True)
     subprocess.run([cli, "deploy", "--prod", "--yes", "--scope", args.scope], cwd=target, check=True)
 

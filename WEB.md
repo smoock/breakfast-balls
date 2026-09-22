@@ -1,8 +1,8 @@
 # Breakfast Balls in the browser
 
-The web edition runs the existing golf game in a browser: Magnolia Pines, the same swing and ball physics, practice, Stroke Play, Skins, Pin Challenge, and 1–4 players sharing one device. Players open a link and press Play; they do not install Godot or download a desktop application.
+The web edition runs the existing golf game in a browser: Magnolia Pines, the same swing and ball physics, practice, Stroke Play, Skins, Pin Challenge, 1–4 players sharing one device, and private online rooms for 2–4 players. Players open a link and press Play; they do not install Godot or download a desktop application.
 
-**Play now: [breakfast-balls.vercel.app](https://breakfast-balls.vercel.app).** The public HTTPS build was verified against the local build manifest and completed an actual practice shot with zero browser errors on September 21, 2026.
+**Play now: [breakfast-balls.vercel.app](https://breakfast-balls.vercel.app).** The public HTTPS build was verified against the local manifest on September 21, 2026. It completed an actual practice shot with zero browser errors and a full online round in two independent browser sessions, including refresh and network recovery.
 
 ## Stack and decision
 
@@ -12,7 +12,8 @@ The web edition runs the existing golf game in a browser: Magnolia Pines, the sa
 | Art | Blender sources and exported GLB models | Keeps the current editable asset pipeline. |
 | Browser runtime | Single-threaded WebAssembly, WebGL 2 Compatibility renderer | Matches the renderer already used by the native game. |
 | Web page | Small HTML/CSS/JavaScript shell | Provides loading, controls, fullscreen, and startup errors without a separate application framework. |
-| Hosting | Static HTTPS hosting on Vercel | Serves the generated game through a separate project and needs no game server. |
+| Hosting / room API | Vercel static files and Node.js Functions | Keeps the existing game URL and coordinates authenticated room actions. |
+| Room storage | Upstash Redis over HTTPS | Atomic revisions, saved round checkpoints, and reconnects across server instances. |
 
 Godot's [web export documentation](https://docs.godotengine.org/en/stable/tutorials/export/exporting_for_web.html) identifies single-threaded export as the default and preferred option. It avoids the cross-origin isolation headers needed for threaded builds. Web exports require WebAssembly and WebGL 2; they use the Compatibility renderer. Use the matching editor and export templates from the [official Godot 4.7.2 release](https://github.com/godotengine/godot-builds/releases/tag/4.7.2-stable).
 
@@ -53,13 +54,13 @@ This build reads the checkout at `/Users/stephenmoock/Documents/ChatGPT/Breakfas
 
 The first release targets desktop and laptop browsers with a keyboard and mouse or trackpad. Chrome, Edge, and Firefox are the initial browser targets. Safari and mobile devices need their own gameplay and performance checks; a page loading on a phone does not establish usable touch controls or acceptable frame rate. Native performance measurements are not browser performance results.
 
-Multiplayer remains local hot-seat play on one device. Sharing the website lets another person launch their own game; it does not join both players into an online round. There are no accounts, matchmaking, shared online leaderboards, or cloud saves.
+Choose **Play online** to create a private room, share its invite link or six-character code, and start when two to four players have joined. Everyone uses their own computer and controls their own golfer. Local hot-seat play remains available. Online rooms need the configured room API and Redis database; a static-only copy supports local play. See [ONLINE.md](ONLINE.md) for setup, reconnect behavior, and verification. There are no player accounts, public matchmaking, or online leaderboards.
 
-Swing-input guidance and club records remain in the current browser's storage; rounds, tee selection, and sound choice are not saved. Clearing site data removes them; another browser or device has a separate record book. Browser storage restrictions can prevent persistence. Audio and fullscreen depend on player interaction. See [Godot's browser limitations](https://docs.godotengine.org/en/stable/tutorials/export/exporting_for_web.html#limitations).
+Swing-input guidance and local club records remain in the current browser's storage. Local rounds are not saved; online rooms retain their shared checkpoint for 24 hours. Online rounds do not write local club records. Tee selection and sound choice are not saved as browser preferences. Clearing site data removes them; another browser or device has a separate record book. Browser storage restrictions can prevent persistence. Audio and fullscreen depend on player interaction. See [Godot's browser limitations](https://docs.godotengine.org/en/stable/tutorials/export/exporting_for_web.html#limitations).
 
 ## Publish and update
 
-Vercel hosts the generated static game in its own project. The account's GitHub Pages address inherits the existing `smoock.com` custom domain, which does not serve this game. A separate Vercel project provides a working game address without changing that domain. The `gh-pages` branch, if present, is a generated mirror rather than the production host.
+Vercel hosts the generated game and private-room API in its own project. The account's GitHub Pages address inherits the existing `smoock.com` custom domain, which does not serve this game. A separate Vercel project provides a working game address without changing that domain. The `gh-pages` branch, if present, is a generated mirror rather than the production host.
 
 After building and checking the game, use the deployment wrapper from the repository root:
 
@@ -67,7 +68,7 @@ After building and checking the game, use the deployment wrapper from the reposi
 python3 tools/deploy_web.py
 ```
 
-The wrapper is the publication entry point: it validates every generated file's hash and prepares `builds/vercel`, keeping Vercel's project metadata outside `builds/web`. It targets project `breakfast-balls` in scope `smoocks-projects` by default; `--project` and `--scope` override those values. `--prepare-only` validates and stages without publishing. Development environment files created by the CLI are excluded and removed before publication.
+The wrapper is the publication entry point: it validates every generated file's hash and prepares `builds/vercel`, keeping Vercel's project metadata outside `builds/web`. Generated assets go in `builds/vercel/public`; `api/room.js` and its server modules are deployed separately from public files. It targets project `breakfast-balls` in scope `smoocks-projects` by default; `--project` and `--scope` override those values. `--prepare-only` validates and stages without publishing. Development environment files created by the CLI are excluded and removed before publication.
 
 Use a current Vercel CLI (at least 47.2.2) and an authenticated account with access to the project. Deployment was verified with CLI 59.25.0 and Node 22.22.1. If the globally installed CLI is older, use a current executable with `--vercel /path/to/vercel`, or run the pinned CLI without changing the global installation:
 
@@ -75,15 +76,15 @@ Use a current Vercel CLI (at least 47.2.2) and an authenticated account with acc
 npx --yes --package=vercel@59.25.0 -c 'python3 tools/deploy_web.py'
 ```
 
-For a direct CLI deployment, copy the complete contents of `builds/web` into a dedicated static deployment directory, link that directory to the Breakfast Balls project, and run:
+For a direct CLI deployment, first run `python3 tools/deploy_web.py --prepare-only`, then deploy the prepared directory:
 
 ```sh
-vercel deploy /path/to/breakfast-balls-deploy --prod
+vercel deploy builds/vercel --prod
 ```
 
-Deploy the generated static files together with unchanged names. The Vercel project should use the **Other** framework setting with no application build step; Godot has already produced the website. Serve `.wasm` as `application/wasm`. The [official Vercel CLI documentation](https://vercel.com/docs/cli/deploy) describes directory deployment and the `--prod` option. Use the reported production URL and check the actual game after publication.
+Use the generated `vercel.json`: **Other** framework, no application build step, `public` output directory, and the Node.js room function. Redis credentials belong only in Vercel's server environment; never add them to HTML or JavaScript. Serve `.wasm` as `application/wasm`. The [official Vercel CLI documentation](https://vercel.com/docs/cli/deploy) describes directory deployment and the `--prod` option. Check the actual game after publication.
 
-For repeatable builds, `.github/workflows/web.yml` provides **Build web artifact**. Run it through **Actions → Build web artifact → Run workflow**. The workflow must first be on the repository's default branch for that entry point to appear. It downloads the pinned official Godot editor and template archive, verifies both against the official SHA-512 manifest, installs the web templates, runs the same Python builder, and uploads `breakfast-balls-web.zip` as an Actions artifact. The archive includes the static website and build manifest and can be downloaded from the successful run for verification and deployment.
+For repeatable builds, `.github/workflows/web.yml` provides **Build web artifact**. Run it through **Actions → Build web artifact → Run workflow**. The workflow must first be on the repository's default branch for that entry point to appear. It downloads the pinned official Godot editor and template archive, verifies both against the official SHA-512 manifest, installs the web templates, runs the same Python builder, and uploads `breakfast-balls-web.zip` as an Actions artifact. The archive includes the static website and build manifest. Online play also requires the API source and Redis configuration from this repository; the archive by itself is a local-play website.
 
 The workflow is manual-only and does not publish a site or change hosting settings. It needs no Vercel credentials or Pages permissions. Commits do not automatically change the live game.
 

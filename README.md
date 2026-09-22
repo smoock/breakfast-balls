@@ -4,7 +4,7 @@ A playable native Godot 4.7 golf prototype: local hot-seat golf, playful golfers
 
 Download the [Mac and Windows playtest builds](https://github.com/smoock/breakfast-balls/releases/latest). No Godot or Blender installation is needed to play.
 
-**[Play the browser edition](https://breakfast-balls.vercel.app)** — the same game through Godot's WebAssembly/WebGL 2 export. Desktop keyboard + mouse/trackpad; 1–4 players sharing one device. See [WEB.md](WEB.md) for the stack decision, browser scope, reproducible build, local preview, and hosting setup.
+**[Play the browser edition](https://breakfast-balls.vercel.app)** — the same game through Godot's WebAssembly/WebGL 2 export. Desktop keyboard + mouse/trackpad; 1–4 players sharing one device or 2–4 players in a private online room. See [ONLINE.md](ONLINE.md) for the online setup. See [WEB.md](WEB.md) for the stack decision, browser scope, reproducible build, local preview, and hosting setup.
 
 ## Play
 

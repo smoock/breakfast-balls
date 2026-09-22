@@ -8,7 +8,10 @@
     "postinstall": "node -e \"require('node:fs').writeFileSync('node_modules/.gdignore', '')\"",
     "build": "python3 tools/build_web.py",
     "serve": "python3 tools/serve_web.py",
-    "test:web": "node tests/web_journey.mjs"
+    "test:web": "node tests/web_journey.mjs",
+    "serve:online": "node tools/serve_online.mjs",
+    "test:online": "node --test tests/online_server.test.mjs",
+    "test:online:browser": "node tests/online_journey.mjs"
   },
   "devDependencies": {
     "playwright": "1.63.0"

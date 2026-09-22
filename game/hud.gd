@@ -160,9 +160,9 @@ func _settings() -> void:
 	button(Rect2(720,407,254,40),"Sound: "+("on" if game.sound_enabled else "off"),"sound",game.sound_enabled)
 	text(Vector2(306,483),"PLAY WITH FRIENDS",12,INK,bold)
 	if game.is_web():
-		text(Vector2(306,520),"1–4 players, taking turns on this device.",19,INK,bold)
-		text(Vector2(306,554),"Choose your foursome on the home screen and pass the controls after each shot.",13,Color("647454"))
-		text(Vector2(306,589),"Swing guidance and club records save in this browser. Online multiplayer is not included.",13,Color("647454"))
+		text(Vector2(306,520),"Play together, here or online.",19,INK,bold)
+		text(Vector2(306,554),"Use the web room lobby to invite friends on their own computers.",13,Color("647454"))
+		text(Vector2(306,589),"Swing guidance and local club records save in this browser.",13,Color("647454"))
 	else:
 		button(Rect2(306,497,328,42),"Parsec remote play","parsec")
 		button(Rect2(646,497,328,42),"Guest timing: "+("on" if game.remote_timing_enabled else "off"),"remote",game.remote_timing_enabled)
@@ -325,10 +325,13 @@ func _game_hud() -> void:
 	text(Vector2(505,77),"NO RECORDS" if game.practice_active else "%d YARDS"%Data.hole_yards(game.hole_index,game.round_tees),12,MUTED)
 	text(Vector2(629,53),"SHORT GAME" if game.practice_active else "CLOSEST TO PIN" if game.mode==2 else "STROKE PLAY" if game.mode==0 else "SKINS · POT %d"%game.skin_pot,14,GOLD,bold)
 	text(Vector2(629,78),"R RETRY · 1/2/3 STATION" if game.practice_active else game.tee_name(game.round_tees).to_upper()+(" · REMOTE" if game.remote_timing_enabled else ""),12,MUTED)
-	button(Rect2(866,40,105,39),"Retry" if game.practice_active else "Card","retrypractice" if game.practice_active else "card")
+	if game.online.active:
+		panel(Rect2(866,40,105,39),Color("284d3f"),8)
+		center(Rect2(866,40,105,39),"ONLINE",12,GOLD,bold)
+	else: button(Rect2(866,40,105,39),"Retry" if game.practice_active else "Card","retrypractice" if game.practice_active else "card")
 	button(Rect2(981,40,105,39),"Flyover","overview",game.overview)
 	button(Rect2(1096,40,62,39),"?","help")
-	button(Rect2(1168,40,65,39),"Ⅱ","pause")
+	button(Rect2(1168,40,65,39),"Snd" if game.online.active else "Ⅱ","sound" if game.online.active else "pause")
 	if game.players.is_empty(): return
 	var p: Dictionary=game.players[game.player_index]
 	panel(Rect2(24,117,308,91),Color(0.07,0.20,0.15,0.90),12)
@@ -395,8 +398,8 @@ func _game_hud() -> void:
 		buttons.append([r,"selectclub:%d"%i])
 	text(Vector2(527,728),"Drag the course / ← → to aim",12,MUTED)
 	_swing_pad()
-	text(Vector2(26,783),"H  Help     V  Flyover     R  Retry     ESC  Pause" if game.practice_active else "H  Help     V  Flyover     TAB  Scorecard     ESC  Pause",12,Color("e9ebd6"))
-	text(Vector2(639,783),"R retry · 1 putt / 2 chip / 3 pitch" if game.practice_active else "Hold Space · Release on center" if game.input_style==0 else "Click gold pad · Pull down · Return & release",12,Color("e9ebd6"))
+	text(Vector2(26,783),"ONLINE · H Help · V Flyover · Leave room above the game" if game.online.active else "H  Help     V  Flyover     R  Retry     ESC  Pause" if game.practice_active else "H  Help     V  Flyover     TAB  Scorecard     ESC  Pause",12,Color("e9ebd6"))
+	text(Vector2(639,783),"Waiting for "+p.tag if game.online.active and not game.can_control_turn() else "R retry · 1 putt / 2 chip / 3 pitch" if game.practice_active else "Hold Space · Release on center" if game.input_style==0 else "Click gold pad · Pull down · Return & release",12,Color("e9ebd6"))
 	if game.state=="flight" and game.swing_elapsed>1.65:
 		panel(Rect2(423,116,418,72),INK,12)
 		center(Rect2(423,120,418,29),game.last_shot,16,GOLD,bold)
@@ -404,6 +407,11 @@ func _game_hud() -> void:
 
 func _swing_pad() -> void:
 	panel(Rect2(958,577,298,179),GOLD,14)
+	if game.online.active and not game.can_control_turn():
+		center(Rect2(970,595,274,35),"SYNCING ROOM…" if game.online.pending else "WATCHING THE FAIRWAY",12,INK,bold)
+		center(Rect2(970,640,274,36),game.players[game.player_index].tag+"'S TURN",18,INK,bold)
+		center(Rect2(970,690,274,42),"Your controls unlock on your turn.",11,INK)
+		return
 	text(Vector2(976,602),"CONTACT SPEED  %.2f×"%game.contact_difficulty(),11,INK,bold)
 	if game.state!="aim":
 		center(Rect2(966,623,280,80),"LET IT COOK…",18,INK,bold); return
@@ -567,7 +575,9 @@ func _result() -> void:
 	if game.record_notice!="": center(Rect2(365,447,550,22),game.record_notice,11,GOLD,bold)
 	elif game.practice_active:
 		for i in range(3): button(Rect2(408+i*158,443,148,29),["1 Putt","2 Chip","3 Pitch"][i],"station:%d"%i,game.practice_station==i)
-	if game.can_take_breakfast_ball():
+	if game.online.active and not game.can_control_turn():
+		center(Rect2(374,487,532,43),"Saving shot…" if game.online.pending else "Waiting for "+game.players[game.player_index].tag+" to continue",15,GOLD,bold)
+	elif game.can_take_breakfast_ball():
 		button(Rect2(374,487,233,43),"PLAY IT    ↵","continue",false,true)
 		button(Rect2(619,487,287,43),"BREAKFAST BALL    B","breakfast")
 	else: button(Rect2(493,487,294,43),"RETRY SHOT    ↵" if game.practice_active else "CONTINUE    ↵","continue",false,true)
@@ -609,7 +619,10 @@ func _scorecard() -> void:
 	if game.players.any(func(p): return p.breakfast_used): text(Vector2(133,625),"* Breakfast Ball used · Round excluded from club records",12,Color("647454"))
 	if game.state=="finished":
 		text(Vector2(133,586),"Same time next Sunday?",14,Color("647454"))
-		button(Rect2(844,593,304,44),"BACK TO THE CLUBHOUSE","menu",false,true)
+		if game.online.active: center(Rect2(775,593,373,44),"Leave the room above to play again.",13,INK)
+		else: button(Rect2(844,593,304,44),"BACK TO THE CLUBHOUSE","menu",false,true)
+	elif game.online.active and not game.can_control_turn():
+		center(Rect2(720,593,428,44),"Waiting for "+game.players[game.player_index].tag,14,INK,bold)
 	else:
 		button(Rect2(844,593,304,44),"FINAL RESULTS  →" if game.hole_done and game.round_position+1>=game.round_length else "NEXT TEE  →" if game.hole_done else "BACK TO PLAY","next",false,true)
 
@@ -639,8 +652,12 @@ func _challenge_scorecard() -> void:
 	var message: String=game.winners_text() if game.state=="finished" else game.hole_message if game.hole_done else "One shot per golfer. Highest three-hole total wins."
 	text(Vector2(133,553),message,16,INK,bold)
 	if game.state=="finished":
-		button(Rect2(133,593,284,44),"ANOTHER SERVING","retrychallenge",false,true)
-		button(Rect2(844,593,304,44),"BACK TO THE CLUBHOUSE","menu")
+		if game.online.active: center(Rect2(720,593,428,44),"Leave the room above to play again.",13,INK)
+		else:
+			button(Rect2(133,593,284,44),"ANOTHER SERVING","retrychallenge",false,true)
+			button(Rect2(844,593,304,44),"BACK TO THE CLUBHOUSE","menu")
+	elif game.online.active and not game.can_control_turn():
+		center(Rect2(720,593,428,44),"Waiting for "+game.players[game.player_index].tag,14,INK,bold)
 	else:
 		button(Rect2(844,593,304,44),"FINAL RESULTS  →" if game.hole_done and game.round_position==2 else "NEXT PIN  →" if game.hole_done else "BACK TO PLAY","next",false,true)
 
@@ -688,6 +705,11 @@ func _input(event: InputEvent) -> void:
 func _action(action: String) -> void:
 	var parts: PackedStringArray=action.split(":")
 	var value: int=int(parts[1]) if parts.size()>1 else 0
+	if game.online.active:
+		var local_actions: Array=["help","closehelp","sound","input","overview"]
+		var turn_actions: Array=["shotstyle","club","selectclub","spin","continue","breakfast","next"]
+		if not parts[0] in local_actions:
+			if not parts[0] in turn_actions or not game.can_control_turn(): return
 	match parts[0]:
 		"settings":
 			if game.state=="menu": game.settings_open=true

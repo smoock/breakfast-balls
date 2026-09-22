@@ -45,7 +45,7 @@ func run() -> void:
 		for character in "→↵←↑↓°×—·Ⅱ–−●◯⚑":
 			check(face.has_char(character.unicode_at(0)),"bundled fonts cover UI glyph U+%04X"%character.unicode_at(0))
 	check(game.hud.serif.get_string_size("Breakfast",HORIZONTAL_ALIGNMENT_LEFT,-1,58).x<405,"web title fits clubhouse panel")
-	check(game.hud.font.get_string_size("Swing guidance and club records save in this browser. Online multiplayer is not included.",HORIZONTAL_ALIGNMENT_LEFT,-1,13).x<668,"web save notice fits settings panel")
+	check(game.hud.font.get_string_size("Swing guidance and local club records save in this browser.",HORIZONTAL_ALIGNMENT_LEFT,-1,13).x<668,"web save notice fits settings panel")
 	game._notification(Node.NOTIFICATION_WM_WINDOW_FOCUS_OUT)
 	check(game.state=="menu" and not game.focus_paused,"focus loss keeps clubhouse usable")
 	game.hud._action("remote"); game.hud._action("parsec")

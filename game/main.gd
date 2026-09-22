@@ -5,6 +5,7 @@ const Course = preload("res://game/course.gd")
 const Hud = preload("res://game/hud.gd")
 const Character=preload("res://game/character.gd")
 const WebBridge=preload("res://game/web_bridge.gd")
+const OnlineSession=preload("res://game/online_session.gd")
 const YARD: float = 0.9144
 var course: Node3D
 var camera: Camera3D
@@ -123,11 +124,15 @@ var settings_open: bool=false
 var parsec_setup_open: bool=false
 var parsec_status: String="FREE REMOTE PLAY · HOST SHARES FROM PARSEC"
 var focus_paused: bool=false
+var online=OnlineSession.new()
 
 var leaderboard_path: String="user://leaderboard.json"
 
 func is_web() -> bool:
 	return OS.has_feature("web")
+
+func can_control_turn() -> bool:
+	return online.can_control()
 
 func cancel_swing_input() -> void:
 	# A release after an overlay or focus change must never complete an old swing.
@@ -137,6 +142,12 @@ func cancel_swing_input() -> void:
 
 func pause_play(from_focus_loss: bool=false) -> void:
 	cancel_swing_input()
+	# A room never pauses for one browser. In particular, a committed shot must
+	# finish if its golfer changes tabs; the room service stores its outcome.
+	if online.active:
+		if from_focus_loss:
+			Input.action_release("ui_left"); Input.action_release("ui_right")
+		return
 	if state in ["aim","flight","result","replay"]:
 		previous_state=state
 		state="pause"
@@ -176,13 +187,13 @@ func style_index() -> int:
 	return shot_style if club>=9 and club<=12 else 0
 
 func select_club(value: int) -> void:
-	if state!="aim" or dragging or keyboard_charge: return
+	if not can_control_turn() or state!="aim" or dragging or keyboard_charge: return
 	club=clampi(value,0,13)
 	if club<9 or club==13: shot_style=0
 	_update_marker()
 
 func set_shot_style(value: int) -> void:
-	if state!="aim" or dragging or keyboard_charge or club<9 or club==13: return
+	if not can_control_turn() or state!="aim" or dragging or keyboard_charge or club<9 or club==13: return
 	shot_style=clampi(value,0,2)
 	_update_marker()
 
@@ -221,7 +232,7 @@ func record_book(value: int=-1) -> Dictionary:
 	return leaderboard["club_tees"]
 
 func start_practice() -> void:
-	if practice_active: return
+	if online.active or practice_active: return
 	practice_settings={"mode":mode,"player_count":player_count,"round_length":round_length,"nine_side":nine_side,"remote":remote_timing_enabled}
 	practice_active=true; mode=0; player_count=1; round_length=9; nine_side=1; remote_timing_enabled=false
 	start_round()
@@ -249,6 +260,7 @@ func retry_practice(keep_setup: bool=true) -> void:
 	_align_golfer(); _update_marker(); _update_camera(1,true)
 
 func return_to_menu() -> void:
+	if online.active: return
 	if practice_active:
 		mode=practice_settings.mode; player_count=practice_settings.player_count
 		round_length=practice_settings.round_length; nine_side=practice_settings.nine_side
@@ -284,6 +296,7 @@ func _save_leaderboard() -> void:
 	if file: file.store_string(JSON.stringify(leaderboard,"  "))
 
 func begin_name_entry() -> void:
+	if online.active: return
 	if is_web(): remote_timing_enabled=false
 	timing_offsets=[0.0,0.0,0.0,0.0]
 	name_entry_index=0
@@ -404,6 +417,7 @@ func toggle_sound() -> void:
 		music.stop(); audio.stop()
 
 func _ready() -> void:
+	online.game=self
 	RenderingServer.set_default_clear_color(Color("b5d4cf"))
 	var world := WorldEnvironment.new()
 	var env := Environment.new()
@@ -635,6 +649,7 @@ func _align_golfer() -> void:
 	_pose_swing(0)
 
 func start_round() -> void:
+	if online.active and not online.applying: return
 	if is_web(): remote_timing_enabled=false
 	focus_paused=false
 	round_tees=0 if mode==CLOSEST_TO_PIN or practice_active else tees
@@ -753,7 +768,7 @@ func change_club(delta: int) -> void:
 	select_club(club+delta)
 
 func shoot(power: float, error: float=0.0, path: float=0.0) -> void:
-	if state!="aim": return
+	if not can_control_turn() or state!="aim": return
 	breakfast_offer=not practice_active and mode!=CLOSEST_TO_PIN and round_position==0 and players[player_index].strokes==0 and not players[player_index].breakfast_used and ball_pos.distance_to(course.tee)<0.5
 	pending_shot_records.clear()
 	record_notice=""
@@ -788,9 +803,11 @@ func shoot(power: float, error: float=0.0, path: float=0.0) -> void:
 	swing_elapsed=0; impact_pending=true
 	last_shot="%d%% POWER  ·  %s" % [int(power*100),shot_shape]
 	if excess>0: last_shot="OVERSWING %d%% · %d%% CONTACT · %s"%[roundi(requested_power*100),roundi(power*100),shot_shape]
+	if online.active: online.publish("shot")
 
 func _physics_process(delta: float) -> void:
 	if state!="flight": return
+	if online.active and online.pending: return
 	swing_elapsed+=delta
 	var angle: float=0
 	if swing_elapsed<0.55: angle=lerpf(0, -2.25,smoothstep(0,0.55,swing_elapsed))
@@ -918,6 +935,7 @@ func _sink() -> void:
 	elif origin_yards>=28: reason="HOLED FROM %d YARDS"%roundi(origin_yards)
 	elif club==13 and origin_yards>=9: reason="DRAINED A %d-FOOT PUTT"%roundi(origin_yards*3.0)
 	if reason!="": _begin_replay(reason)
+	online.queue_settle()
 
 func _finish_shot(title: String="", detail: String="") -> void:
 	if mode==CLOSEST_TO_PIN:
@@ -940,9 +958,10 @@ func _finish_shot(title: String="", detail: String="") -> void:
 	var origin_yards: float=Vector2(shot_origin.x-course.pin.x,shot_origin.z-course.pin.z).length()/YARD
 	if title=="" and great=="" and origin_yards>=80 and distance_to_pin()<=3.0: great="DART TO %.1f FEET"%(distance_to_pin()*3.0)
 	if great!="": _begin_replay(great)
+	online.queue_settle()
 
 func _begin_replay(reason: String) -> void:
-	if practice_active: return
+	if online.active or practice_active: return
 	if trail.size()<5 or (qa_mode and not "--qa-replay" in OS.get_cmdline_user_args()): return
 	replay_path=trail.duplicate()
 	replay_path.append(ball_pos)
@@ -1014,7 +1033,7 @@ func distance_text() -> String:
 	return "%.1f ft" % (d*3.0) if club==13 else "%.1f yd" % d if d<30 else "%d yd" % roundi(d)
 
 func can_take_breakfast_ball() -> bool:
-	return state=="result" and breakfast_offer and mode!=CLOSEST_TO_PIN and not players[player_index].breakfast_used
+	return can_control_turn() and state=="result" and breakfast_offer and mode!=CLOSEST_TO_PIN and not players[player_index].breakfast_used
 
 func take_breakfast_ball() -> void:
 	if not can_take_breakfast_ball() or help_open: return
@@ -1036,6 +1055,7 @@ func take_breakfast_ball() -> void:
 			var sample: float=rng.randf_range(-1,1)*exp(-t*65)*0.3+sin(t*TAU*1046)*exp(-t*18)*0.1
 			bytes.encode_s16(i*2,int(sample*32767))
 		stream.data=bytes; audio.stream=stream; audio.play()
+	if online.active: online.publish("breakfast")
 
 func _commit_shot_records() -> void:
 	breakfast_offer=false
@@ -1056,9 +1076,10 @@ func _finish_challenge_shot(holed: bool=false,miss_reason: String="") -> void:
 	result_detail="One shot served. Next golfer, same pin." if valid else (miss_reason.capitalize()+" · " if miss_reason!="" else "")+"Finish on the green to score. Next tee, fresh start."
 	state="result"; result_time=0; trail.append(ball_pos)
 	if valid and not holed and feet<=10: _begin_replay("PIN SEEKER · %.1f FEET"%feet)
+	online.queue_settle()
 
 func advance_turn() -> void:
-	if state!="result": return
+	if not can_control_turn() or state!="result": return
 	if practice_active: retry_practice(); return
 	_commit_shot_records()
 	var all_done: bool=true
@@ -1084,6 +1105,7 @@ func advance_turn() -> void:
 				hole_message="Tied hole. %d skins carry to the next." % skin_pot
 				if round_position==round_length-1: hole_message="Tied final hole. %d unclaimed skins expire; no playoff." % (skin_pot-1)
 		hole_done=true; state="scorecard"
+		if online.active: online.publish("advance")
 		return
 	# Everyone tees off, then the player farthest from the hole plays next.
 	var farthest: float=-1.0
@@ -1093,12 +1115,19 @@ func advance_turn() -> void:
 		if players[i].strokes==0: d+=10000
 		if d>farthest: farthest=d; player_index=i
 	_prepare_turn()
+	if online.active: online.publish("advance")
 
 func next_hole() -> void:
+	if not can_control_turn(): return
+	if online.active and (not hole_done or state!="scorecard"): return
 	if not hole_done:
 		state=score_return; return
-	if round_position+1>=round_length: state="finished"; return
+	if round_position+1>=round_length:
+		state="finished"
+		if online.active: online.publish("next")
+		return
 	round_position+=1; hole_index=round_holes[round_position]; start_hole()
+	if online.active: online.publish("next")
 
 func total_score(i: int) -> int:
 	var s: int=0
@@ -1152,7 +1181,7 @@ func _process(delta: float) -> void:
 	if state=="result": result_time+=delta
 	if keyboard_charge and state=="aim" and not help_open: charge=minf(charge+delta*0.55,1.6)
 	if dragging and state=="aim" and not help_open and pull>=1.0: full_power_hold+=delta
-	if state=="aim" and not help_open:
+	if state=="aim" and not help_open and can_control_turn():
 		var axis: float=Input.get_axis("ui_left","ui_right")
 		if axis!=0: aim+=axis*delta*0.55; _update_marker()
 	_update_camera(delta)
@@ -1211,6 +1240,16 @@ func _update_camera(delta: float, instant: bool=false) -> void:
 	if camera.position.distance_to(target)>0.1: camera.look_at(target,Vector3.UP)
 
 func _input(event: InputEvent) -> void:
+	if online.active:
+		if event is InputEventKey and event.pressed and not event.echo:
+			if event.keycode==KEY_H:
+				help_open=not help_open; cancel_swing_input(); return
+			if event.keycode==KEY_ESCAPE:
+				help_open=false; cancel_swing_input(); return
+			if event.keycode==KEY_V and state=="aim":
+				overview=not overview; return
+			if event.keycode==KEY_TAB: return
+		if not can_control_turn(): return
 	if settings_open and not parsec_setup_open:
 		if event is InputEventKey and event.pressed and not event.echo and event.keycode==KEY_ESCAPE: settings_open=false
 		return

@@ -16,7 +16,7 @@ GENERATED_NAMES = {
     "index.html", "index.js", "index.wasm", "index.pck", "index.png", "index.icon.png",
     "index.apple-touch-icon.png", "index.audio.worklet.js", "index.audio.position.worklet.js",
     "index.service.worker.js", "index.offline.html", "index.manifest.json",
-    "build-info.json", "third-party-notices.txt", ".nojekyll",
+    "build-info.json", "third-party-notices.txt", ".nojekyll", "online.js", "online.css",
 }
 
 
@@ -84,6 +84,8 @@ def build(args):
         if "$GODOT" in (destination / "index.html").read_text():
             raise SystemExit("Unexpanded Godot HTML placeholders remain.")
         (destination / ".nojekyll").touch()
+        for name in ("online.js", "online.css"):
+            shutil.copy2(ROOT / "web" / name, destination / name)
         notices = [ROOT / "web/THIRD_PARTY_NOTICES.txt", *sorted((ROOT / "game/assets/fonts").glob("*OFL.txt"))]
         notice_parts = [f"{path.name}\n{'=' * len(path.name)}\n{path.read_text()}" for path in notices if path.is_file()]
         if notice_parts:

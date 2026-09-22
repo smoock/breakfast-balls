@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="theme-color" content="#173e32">
-  <meta name="description" content="Good swings. Bad puns. Great mornings. Play Breakfast Balls, a local 1–4 player golf game, right in your browser.">
+  <meta name="description" content="Good swings. Bad puns. Great mornings. Play Breakfast Balls with friends online or on the same computer, right in your browser.">
   <title>Breakfast Balls · The Early Bird Golf Club</title>
   <style>
     :root { color-scheme: light; --cream: #f7f1dd; --paper: #fffbee; --green: #173e32; --muted: #577062; --gold: #edc56c; --line: #d8d9bf; }
@@ -99,6 +99,7 @@
     @media (prefers-reduced-motion: no-preference) { button { transition: background-color .15s; } }
   </style>
   $GODOT_HEAD_INCLUDE
+  <link rel="stylesheet" href="online.css">
   <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='15' fill='%23173e32'/%3E%3Ctext x='31' y='41' fill='%23f7f1dd' text-anchor='middle' font-family='Georgia,serif' font-weight='bold' font-size='26' letter-spacing='-3'%3EBB.%3C/text%3E%3C/svg%3E">
 </head>
 <body>
@@ -116,6 +117,13 @@
         <button class="text-button" id="fullscreen" hidden>Full screen ↗</button>
       </nav>
     </header>
+    <aside id="online-bar" class="online-bar" aria-label="Online round" hidden>
+      <button id="online-room-details" class="text-button">Room <strong id="online-bar-code"></strong></button>
+      <span id="online-bar-status" role="status" aria-live="polite">Connecting…</span>
+      <button id="online-recover" class="text-button" hidden>Recover interrupted shot</button>
+      <button id="online-bar-invite" class="text-button">Copy invite</button>
+      <button id="online-leave" class="text-button">Leave room</button>
+    </aside>
     <main>
       <section class="stage" id="stage" aria-label="Breakfast Balls game">
         <canvas id="canvas" width="1280" height="800" tabindex="0" aria-label="Breakfast Balls golf game" aria-describedby="canvas-instructions">Your browser needs canvas support to play Breakfast Balls.</canvas>
@@ -128,12 +136,13 @@
             <p class="description">Meet your foursome at Magnolia Pines. Eighteen holes, a little friendly competition, and a fresh start off the first tee.</p>
             <div class="error" id="error" role="alert" hidden><strong id="error-title">A little delay at the first tee.</strong><p id="error-message"></p></div>
             <button class="primary" id="play" disabled><span id="play-label">Play in browser</span><span class="arrow" aria-hidden="true">→</span></button>
+            <button class="online-launch" id="play-online" aria-haspopup="dialog">Play online with friends <span aria-hidden="true">↗</span></button>
             <div class="loading" id="loading" hidden>
               <p id="load-label">Opening the clubhouse…</p>
               <progress id="progress" aria-label="Loading Breakfast Balls"></progress>
               <span class="load-detail" id="load-detail">The first visit takes a moment.</span>
             </div>
-            <p class="under-button" id="launch-note"><strong>1–4 players · Same-device play</strong><br>Keyboard + mouse or trackpad. No account needed.</p>
+            <p class="under-button" id="launch-note"><strong>1–4 locally · 2–4 online</strong><br>Keyboard + mouse or trackpad. No account needed.</p>
           </div>
           <div class="illustration" aria-hidden="true">
             <div class="course-label"><div class="eyebrow">Magnolia Pines<br><span style="font-weight:400;letter-spacing:.06em">A little slice of the good life.</span></div><div class="number">18<small>HOLES / PAR 72</small></div></div>
@@ -159,7 +168,7 @@
     </main>
     <footer class="footer">
       <p id="footer-hint">Made for a leisurely round on your desktop.<span class="desktop-note">For the full game, use a computer with a keyboard and mouse.</span></p>
-      <p class="save-note">Swing guidance and club records are saved in this browser. Private browsing or clearing site data can erase them. Rounds are not saved. <a href="third-party-notices.txt" target="_blank" rel="noopener">Credits</a></p>
+      <p class="save-note">Swing guidance and club records are saved in this browser. Online rooms reconnect in the same tab; local rounds are not saved. <a href="third-party-notices.txt" target="_blank" rel="noopener">Credits</a></p>
     </footer>
   </div>
   <dialog id="help" aria-labelledby="help-title">
@@ -176,6 +185,40 @@
     </dl>
     <p class="dialog-note"><kbd>Shift</kbd> + <kbd>Tab</kbd> moves from the game to these page controls. Full screen is optional. Click inside the game to enable sound; adjust it in the game's Settings.</p>
   </dialog>
+  <dialog id="online-dialog" aria-labelledby="online-title">
+    <div class="dialog-head"><div><div class="eyebrow">A foursome, wherever you are</div><h2 id="online-title">Meet on the first tee.</h2></div><button id="online-close" class="text-button close-button" aria-label="Close online room">Close</button></div>
+    <p id="online-message" class="online-message" role="status" aria-live="polite"></p>
+    <div id="online-setup">
+      <p class="lead">Create a private room and send the invite to your friends. Everyone plays their own shots and watches the round together.</p>
+      <button id="online-resume-room" class="text-button" hidden>Resume your room</button>
+      <button id="online-reset" class="text-button" hidden>Return to clubhouse</button>
+      <form id="online-form">
+        <div class="online-fields">
+          <label>Your name <input id="online-name" name="name" maxlength="5" pattern="[A-Za-z]{1,5}" value="BIRDY" autocomplete="off" autocapitalize="characters" spellcheck="false" required aria-describedby="online-name-help"><span id="online-name-help">1–5 letters, shown on the scorecard.</span></label>
+          <label>Your golfer <select id="online-golfer" name="golfer"><option value="0">Tommy Beatswood</option><option value="1">Thotty Scheffler</option><option value="2">Rory Whacklroy</option><option value="3">Ballin Morikowa</option><option value="4">Jon Rahmlette</option><option value="5">Bready Couples</option><option value="6">Justin Thyme</option><option value="7">Bubba Waffles</option></select></label>
+        </div>
+        <fieldset id="online-course-options"><legend>Create a room</legend><div class="online-fields">
+          <label>Game <select id="online-mode"><option value="0">Stroke play</option><option value="1">Skins</option><option value="2">Pin Challenge</option></select></label>
+          <label>Round <select id="online-holes"><option value="3">3 holes</option><option value="9">9 holes</option><option value="18">18 holes</option></select></label>
+          <label>Tees <select id="online-tees"><option value="0">Championship tees</option><option value="1">Club tees</option></select></label>
+          <label id="online-nine-label" hidden>Nine <select id="online-nine"><option value="0">Front nine</option><option value="1">Back nine</option></select></label>
+        </div><button class="primary online-primary" id="online-create" type="submit">Create private room <span aria-hidden="true">→</span></button></fieldset>
+        <fieldset><legend>Have an invite?</legend><div class="online-join-row"><label class="sr-only" for="online-code">Six-character room code</label><input id="online-code" name="code" maxlength="6" placeholder="ROOM CODE" autocomplete="off" autocapitalize="characters" spellcheck="false" aria-label="Six-character room code"><button id="online-join" class="text-button" type="button">Join room</button></div></fieldset>
+      </form>
+      <p class="dialog-note">Private rooms hold 2–4 golfers. Keep this tab open during your shot. Refreshing this tab reconnects to your seat.</p>
+    </div>
+    <div id="online-lobby" hidden>
+      <div class="online-invite-card"><div><span class="eyebrow">Your private room</span><strong id="online-room-code"></strong></div><button id="online-copy" class="text-button">Copy invite link</button></div>
+      <p id="online-round-summary" class="lead"></p>
+      <ol id="online-roster" class="online-roster" aria-label="Golfers in the room"></ol>
+      <p id="online-lobby-hint" class="dialog-note"></p>
+      <button id="online-start" class="primary online-primary" hidden>Tee off together <span aria-hidden="true">→</span></button>
+      <button id="online-return" class="text-button" hidden>Back to the round</button>
+      <button id="online-lobby-leave" class="text-button">Leave room</button>
+    </div>
+    <div id="online-recovery-note" class="dialog-note" hidden>The golfer whose shot was interrupted can reconnect. After a minute, anyone can restore the position before that shot using the room bar.</div>
+  </dialog>
+  <script src="online.js"></script>
   <div class="sr-only" id="announcement" role="status" aria-live="polite"></div>
   <script>
     (() => {
@@ -215,6 +258,7 @@
         byId('resume').hidden = true;
         play.hidden = false;
         play.disabled = false;
+        byId('play-online').hidden = false;
         byId('play-label').textContent = 'Try again';
         byId('launch-note').textContent = 'A reload gives the game a fresh start.';
       }
@@ -247,6 +291,7 @@
           checkBrowser();
           setState('loading');
           play.hidden = true;
+          byId('play-online').hidden = true;
           byId('loading').hidden = false;
           byId('launch-note').textContent = 'A fresh course is on its way. Keep this tab open.';
           byId('announcement').textContent = 'Loading Breakfast Balls.';
@@ -299,6 +344,7 @@
         canvas.focus({ preventScroll: true });
       }
 
+      window.BreakfastLaunch = Object.freeze({ start, get state() { return state; } });
       play.addEventListener('click', start);
       byId('resume').addEventListener('click', () => canvas.focus({ preventScroll: true }));
       byId('controls').addEventListener('click', () => help.showModal());

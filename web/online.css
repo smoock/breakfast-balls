@@ -1,0 +1,39 @@
+.online-launch { display: flex; align-items: center; justify-content: space-between; gap: 28px; min-width: 246px; margin-top: 12px; border: 1px solid #759784; border-radius: 8px; padding: 12px 18px; background: transparent; color: var(--cream); font-size: 13px; font-weight: 700; }
+.online-launch:hover { background: #315345; }
+.online-launch span { font-size: 18px; }
+.online-bar { width: min(1280px, calc(100% - 32px)); margin: 0 auto 9px; padding: 5px; border-radius: 7px; background: #173e32; display: flex; align-items: center; flex-wrap: wrap; gap: 8px; color: var(--cream); font-size: 12px; }
+#online-bar-status { flex: 1; min-width: 120px; padding: 3px 6px; }
+.online-bar .text-button { color: var(--cream); border-color: #516b5c; }
+.online-bar .text-button:hover { background: #315345; }
+.online-bar strong { letter-spacing: .12em; margin-left: 3px; }
+html[data-online="true"][data-game-state="playing"] .stage { width: min(1280px, calc((100svh - 154px) * 1.6), calc(100vw - 32px)); }
+#online-dialog { width: min(580px, calc(100% - 32px)); max-height: calc(100svh - 32px); }
+.online-fields { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+#online-dialog label { display: flex; flex-direction: column; gap: 6px; font-size: 12px; font-weight: 700; }
+#online-dialog label > span { font-size: 10px; font-weight: 400; color: var(--muted); }
+#online-dialog input, #online-dialog select { width: 100%; min-height: 42px; min-width: 0; border: 1px solid #b8c5ae; border-radius: 6px; background: #fffdf4; color: var(--green); font: 14px system-ui, sans-serif; padding: 9px 10px; }
+#online-dialog input:focus-visible, #online-dialog select:focus-visible { outline: 3px solid #ab6d16; outline-offset: 2px; }
+#online-name, #online-code { text-transform: uppercase; letter-spacing: .12em; }
+#online-dialog fieldset { border: 0; border-top: 1px solid var(--line); padding: 16px 0 0; margin: 23px 0 0; }
+#online-dialog legend { padding-right: 12px; font-size: 11px; font-weight: 750; text-transform: uppercase; letter-spacing: .08em; }
+.online-primary { min-width: 0; width: 100%; margin-top: 18px; min-height: 47px; }
+.online-join-row { display: flex; gap: 10px; }
+.online-join-row input { flex: 1; }
+.online-message:empty { display: none; }
+.online-message { border-radius: 7px; background: #e6ead3; padding: 11px 13px; color: var(--green); font-size: 13px; }
+.online-message[data-error="true"] { background: #f6e1cd; color: #764127; }
+.online-invite-card { display: flex; align-items: center; justify-content: space-between; gap: 16px; border: 1px solid #bcc9ac; background: #edf0da; border-radius: 9px; padding: 15px 17px; margin-top: 22px; }
+.online-invite-card .eyebrow { display: block; color: var(--muted); font-size: 9px; }
+#online-room-code { display: block; font: 700 27px/1.25 ui-monospace, monospace; letter-spacing: .16em; margin-top: 4px; }
+.online-roster { padding: 0; margin: 18px 0; list-style: none; }
+.online-roster li { display: flex; align-items: center; gap: 12px; border-top: 1px solid var(--line); padding: 11px 0; }
+.online-roster .seat-number { border: 1px solid #bcc9ac; border-radius: 50%; width: 29px; height: 29px; display: grid; place-items: center; font-size: 11px; font-weight: 700; }
+.online-roster .seat-info { flex: 1; }
+.online-roster strong { display: block; font-size: 13px; letter-spacing: .07em; }
+.online-roster small { color: var(--muted); font-size: 11px; }
+.online-roster .seat-role { font-size: 10px; color: var(--muted); }
+#online-lobby-leave { display: block; margin: 15px auto 0; }
+#online-return { width: 100%; padding: 12px; }
+#online-resume-room { width: 100%; margin-bottom: 19px; }
+#online-reset { display: block; margin: -8px auto 20px; }
+@media (max-width: 680px) { .online-bar { gap: 6px; } #online-bar-status { order: 5; flex-basis: 100%; padding-left: 0; } .online-fields { gap: 10px; } .online-invite-card { padding: 13px; } #online-room-code { font-size: 23px; } .online-bar .text-button { font-size: 10px; padding: 6px 8px; } html[data-online="true"][data-game-state="playing"] .stage { width: min(1280px, calc((100svh - 185px) * 1.6), calc(100vw - 32px)); } }
