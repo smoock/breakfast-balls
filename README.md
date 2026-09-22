@@ -4,6 +4,8 @@ A playable native Godot 4.7 golf prototype: local hot-seat golf, playful golfers
 
 Download the [Mac and Windows playtest builds](https://github.com/smoock/breakfast-balls/releases/latest). No Godot or Blender installation is needed to play.
 
+**[Play the browser edition](https://breakfast-balls.vercel.app)** — the same game through Godot's WebAssembly/WebGL 2 export. Desktop keyboard + mouse/trackpad; 1–4 players sharing one device. See [WEB.md](WEB.md) for the stack decision, browser scope, reproducible build, local preview, and hosting setup.
+
 ## Play
 
 Open `project.godot` in Godot and press **F6** with the main scene open, or **F5** to run the project. Choose 1–4 players, each golfer, Stroke Play or Skins, and a 3-, 9-, or 18-hole round. Three-hole rounds draw three distinct random holes in random order. Nine-hole rounds offer Front 9 (1–9) or Back 9 (10–18). All eight golfers have identical gameplay stats.

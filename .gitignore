@@ -2,3 +2,6 @@
 *.import
 .DS_Store
 /builds/
+/node_modules/
+/test-results/
+__pycache__/

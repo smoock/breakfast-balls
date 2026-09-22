@@ -4,6 +4,7 @@ const Data = preload("res://game/data.gd")
 const Course = preload("res://game/course.gd")
 const Hud = preload("res://game/hud.gd")
 const Character=preload("res://game/character.gd")
+const WebBridge=preload("res://game/web_bridge.gd")
 const YARD: float = 0.9144
 var course: Node3D
 var camera: Camera3D
@@ -121,15 +122,47 @@ const MAX_TIMING_OFFSET: float=0.35
 var settings_open: bool=false
 var parsec_setup_open: bool=false
 var parsec_status: String="FREE REMOTE PLAY · HOST SHARES FROM PARSEC"
+var focus_paused: bool=false
 
 var leaderboard_path: String="user://leaderboard.json"
+
+func is_web() -> bool:
+	return OS.has_feature("web")
+
+func cancel_swing_input() -> void:
+	# A release after an overlay or focus change must never complete an old swing.
+	dragging=false; keyboard_charge=false; aiming_drag=false
+	charge=0.0; pull=0.0; swing_clock=0.0; full_power_hold=0.0; path_offset=0.0
+	drag_start=Vector2.ZERO; drag_current=Vector2.ZERO; peak_y=0.0
+
+func pause_play(from_focus_loss: bool=false) -> void:
+	cancel_swing_input()
+	if state in ["aim","flight","result","replay"]:
+		previous_state=state
+		state="pause"
+		focus_paused=from_focus_loss
+	elif state=="pause" and from_focus_loss:
+		focus_paused=true
+	if from_focus_loss:
+		Input.action_release("ui_left")
+		Input.action_release("ui_right")
+
+func resume_play() -> void:
+	if state!="pause": return
+	cancel_swing_input()
+	focus_paused=false
+	state=previous_state
+
+func _notification(what: int) -> void:
+	if is_web() and what in [NOTIFICATION_APPLICATION_FOCUS_OUT,NOTIFICATION_WM_WINDOW_FOCUS_OUT]:
+		pause_play(true)
 
 func swing_power() -> float:
 	return charge if keyboard_charge else minf(1.6,maxf(pull+full_power_hold*0.4,swing_clock*0.55))
 
 func set_input_style(value: int) -> void:
 	input_style=clampi(value,0,1)
-	dragging=false; keyboard_charge=false; aiming_drag=false
+	cancel_swing_input()
 	var config:=ConfigFile.new()
 	config.set_value("controls","input_style",input_style)
 	config.save(preferences_path)
@@ -221,7 +254,8 @@ func return_to_menu() -> void:
 		round_length=practice_settings.round_length; nine_side=practice_settings.nine_side
 		remote_timing_enabled=practice_settings.remote
 	practice_active=false; practice_settings.clear()
-	state="menu"; help_open=false; settings_open=false; parsec_setup_open=false; player_index=0; dragging=false; keyboard_charge=false; aiming_drag=false
+	state="menu"; help_open=false; settings_open=false; parsec_setup_open=false; player_index=0; focus_paused=false
+	cancel_swing_input()
 
 func _default_leaderboard() -> Dictionary:
 	return {
@@ -250,6 +284,7 @@ func _save_leaderboard() -> void:
 	if file: file.store_string(JSON.stringify(leaderboard,"  "))
 
 func begin_name_entry() -> void:
+	if is_web(): remote_timing_enabled=false
 	timing_offsets=[0.0,0.0,0.0,0.0]
 	name_entry_index=0
 	name_entry_value=str(player_tags[0]).to_upper().left(5)
@@ -267,6 +302,10 @@ func _accept_name_entry() -> void:
 		name_entry_value=str(player_tags[name_entry_index]).to_upper().left(5)
 
 func begin_calibration() -> void:
+	if is_web():
+		remote_timing_enabled=false
+		start_round()
+		return
 	calibration_player=1
 	calibration_samples.clear()
 	calibration_clock=0.0
@@ -290,13 +329,14 @@ func record_calibration_sample() -> void:
 	if calibration_player>=player_count: start_round()
 
 func player_timing_offset(index: int=player_index) -> float:
-	if not remote_timing_enabled or index<=0 or index>=timing_offsets.size(): return 0.0
+	if is_web() or not remote_timing_enabled or index<=0 or index>=timing_offsets.size(): return 0.0
 	return float(timing_offsets[index])
 
 func evaluated_face_meter() -> float:
 	return sin((swing_clock-player_timing_offset())*5.6*contact_difficulty())*0.85
 
 func open_parsec() -> void:
+	if is_web(): return
 	if OS.get_name()=="macOS" and DirAccess.dir_exists_absolute("/Applications/Parsec.app"):
 		var process_id: int=OS.create_process("/usr/bin/open",["-a","Parsec"])
 		parsec_status="PARSEC OPENED · SHARE THIS COMPUTER" if process_id>=0 else "Open Parsec from Applications"
@@ -415,6 +455,10 @@ func _ready() -> void:
 	_start_music()
 	ball_pos=course.tee; ball.position=ball_pos
 	_update_camera(1.0,true)
+	if is_web():
+		var bridge:=WebBridge.new()
+		bridge.game=self
+		add_child(bridge)
 	qa_mode="--qa" in OS.get_cmdline_user_args()
 	if "--qa-play" in OS.get_cmdline_user_args(): start_round()
 	if "--qa-green" in OS.get_cmdline_user_args():
@@ -591,6 +635,8 @@ func _align_golfer() -> void:
 	_pose_swing(0)
 
 func start_round() -> void:
+	if is_web(): remote_timing_enabled=false
+	focus_paused=false
 	round_tees=0 if mode==CLOSEST_TO_PIN or practice_active else tees
 	players.clear(); hole_index=0; player_index=0; skin_pot=1; last_shot=""; help_open=false; record_notice=""
 	breakfast_offer=false; pending_shot_records.clear(); breakfast_flash=0.0
@@ -629,8 +675,8 @@ func _prepare_turn() -> void:
 	aim=atan2(direction.x,-direction.z)
 	shot_style=0
 	club=_recommended_club()
-	spin=0; state="aim"; pull=0; charge=0; dragging=false; keyboard_charge=false; aiming_drag=false
-	swing_clock=0; full_power_hold=0; path_offset=0
+	spin=0; state="aim"; focus_paused=false
+	cancel_swing_input()
 	trail.clear(); _draw_trail(); _build_golfer()
 	impact_pending=false
 	_align_golfer()
@@ -1195,7 +1241,7 @@ func _input(event: InputEvent) -> void:
 			ball.visible=not players[player_index].challenge_shot.get("holed",false) if mode==CLOSEST_TO_PIN else not players[player_index].done
 			state=replay_return_state; result_time=0; return
 		if event.keycode==KEY_H:
-			help_open=not help_open; dragging=false; keyboard_charge=false; return
+			help_open=not help_open; cancel_swing_input(); return
 		if help_open and event.keycode!=KEY_ESCAPE: return
 		if practice_active and state in ["aim","flight","result"]:
 			if event.keycode==KEY_R: retry_practice(); return
@@ -1203,8 +1249,8 @@ func _input(event: InputEvent) -> void:
 		if event.keycode==KEY_B and state=="result": take_breakfast_ball(); return
 		if event.keycode==KEY_ESCAPE:
 			if help_open: help_open=false
-			elif state=="pause": state=previous_state
-			elif state in ["aim","flight","result"]: previous_state=state; state="pause"; dragging=false; keyboard_charge=false
+			elif state=="pause": resume_play()
+			elif state in ["aim","flight","result"]: pause_play()
 			return
 		if event.keycode==KEY_ENTER:
 			if state=="menu": begin_name_entry()
@@ -1218,11 +1264,11 @@ func _input(event: InputEvent) -> void:
 			if event.keycode==KEY_S and not dragging and not keyboard_charge: spin=(spin+2)%3-1
 			if event.keycode==KEY_X: set_shot_style((style_index()+1)%3)
 			if event.keycode==KEY_TAB and not practice_active:
-				dragging=false; keyboard_charge=false; score_return=state; state="scorecard"
+				cancel_swing_input(); score_return=state; state="scorecard"
 			if event.keycode==KEY_SPACE and not dragging: keyboard_charge=true; charge=0; swing_clock=0; path_offset=0; full_power_hold=0
 			if event.keycode==KEY_A: path_offset=clampf(path_offset-0.15,-1,1)
 			if event.keycode==KEY_D: path_offset=clampf(path_offset+0.15,-1,1)
-	if event is InputEventKey and not event.pressed and event.keycode==KEY_SPACE and keyboard_charge:
+	if event is InputEventKey and not event.pressed and event.keycode==KEY_SPACE and keyboard_charge and state=="aim" and not help_open:
 		shoot(maxf(charge,0.04),evaluated_face_meter(),path_offset)
 	if help_open or state!="aim": return
 	if event is InputEventMouseButton:

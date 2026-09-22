@@ -7,16 +7,38 @@ const GOLD=Color("eec66c")
 const MUTED=Color("a8bdb0")
 var game: Node
 var font: Font=ThemeDB.fallback_font
-var bold:=SystemFont.new()
-var serif:=SystemFont.new()
+var bold: Font=ThemeDB.fallback_font
+var serif: Font=ThemeDB.fallback_font
 var buttons: Array=[]
 var swing_rect:=Rect2(958,594,286,160)
 
 func _ready() -> void:
 	set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	mouse_filter=Control.MOUSE_FILTER_IGNORE
-	bold.font_names=PackedStringArray(["Avenir Next","Noto Sans"]); bold.font_weight=700
-	serif.font_names=PackedStringArray(["Georgia","Noto Serif"]); serif.font_weight=700
+	# Ship the browser's typefaces and UI glyphs instead of depending on the host.
+	if game.is_web():
+		var math_symbols: FontFile=load("res://game/assets/fonts/NotoSansMath-UI.ttf")
+		var basic_symbols: FontFile=load("res://game/assets/fonts/NotoSansSymbols-UI.ttf")
+		var web_body: FontFile=load("res://game/assets/fonts/NotoSans-Regular-Latin.ttf")
+		var web_bold: FontFile=load("res://game/assets/fonts/NotoSans-Bold-Latin.ttf")
+		var title_face: FontFile=load("res://game/assets/fonts/LibreBaskerville.ttf")
+		for face in [math_symbols,basic_symbols,web_body,web_bold,title_face]:
+			face.allow_system_fallback=false
+		web_body.fallbacks=[math_symbols,basic_symbols]
+		web_bold.fallbacks=[math_symbols,basic_symbols]
+		font=web_body; bold=web_bold
+		title_face.fallbacks=[font]
+		var web_title:=FontVariation.new()
+		web_title.base_font=title_face
+		web_title.variation_opentype={"wght":700.0}
+		serif=web_title
+	else:
+		var heading:=SystemFont.new()
+		heading.font_names=PackedStringArray(["Avenir Next","Noto Sans"]); heading.font_weight=700
+		bold=heading
+		var title:=SystemFont.new()
+		title.font_names=PackedStringArray(["Georgia","Noto Serif"]); title.font_weight=700
+		serif=title
 
 func panel(r: Rect2,c: Color,radius: int=14,border: Color=Color.TRANSPARENT) -> void:
 	var s:=StyleBoxFlat.new(); s.bg_color=c
@@ -65,7 +87,7 @@ func _menu() -> void:
 	text(Vector2(32,179),"Balls.",72,CREAM,serif)
 	draw_line(Vector2(38,204),Vector2(434,204),Color("527160"),1)
 	text(Vector2(38,237),"Good swings. Bad puns. Great mornings.",17,CREAM)
-	text(Vector2(38,273),"YOUR FOURSOME",12,GOLD,bold)
+	text(Vector2(38,273),"YOUR FOURSOME · SAME DEVICE" if game.is_web() else "YOUR FOURSOME",12,GOLD,bold)
 	for i in range(4): button(Rect2(38+i*100,287,91,38),str(i+1)+(" player" if i==0 else " players"),"players:%d"%(i+1),game.player_count==i+1)
 	text(Vector2(38,357),"THE GAME",12,GOLD,bold)
 	button(Rect2(38,371,126,41),"Stroke Play","mode:0",game.mode==0)
@@ -137,10 +159,15 @@ func _settings() -> void:
 	text(Vector2(306,430),"SOUND",12,INK,bold)
 	button(Rect2(720,407,254,40),"Sound: "+("on" if game.sound_enabled else "off"),"sound",game.sound_enabled)
 	text(Vector2(306,483),"PLAY WITH FRIENDS",12,INK,bold)
-	button(Rect2(306,497,328,42),"Parsec remote play","parsec")
-	button(Rect2(646,497,328,42),"Guest timing: "+("on" if game.remote_timing_enabled else "off"),"remote",game.remote_timing_enabled)
-	text(Vector2(306,566),"Parsec shares your game with guests. Enable timing to calibrate their swings.",13,Color("647454"))
-	text(Vector2(306,589),"Choose the player count on the home screen. Player 1 hosts.",13,Color("647454"))
+	if game.is_web():
+		text(Vector2(306,520),"1–4 players, taking turns on this device.",19,INK,bold)
+		text(Vector2(306,554),"Choose your foursome on the home screen and pass the controls after each shot.",13,Color("647454"))
+		text(Vector2(306,589),"Swing guidance and club records save in this browser. Online multiplayer is not included.",13,Color("647454"))
+	else:
+		button(Rect2(306,497,328,42),"Parsec remote play","parsec")
+		button(Rect2(646,497,328,42),"Guest timing: "+("on" if game.remote_timing_enabled else "off"),"remote",game.remote_timing_enabled)
+		text(Vector2(306,566),"Parsec shares your game with guests. Enable timing to calibrate their swings.",13,Color("647454"))
+		text(Vector2(306,589),"Choose the player count on the home screen. Player 1 hosts.",13,Color("647454"))
 	text(Vector2(306,675),"ESC  Back to clubhouse",12,Color("647454"))
 	button(Rect2(714,647,260,44),"DONE","closesettings",false,true)
 
@@ -622,6 +649,7 @@ func _pause() -> void:
 	draw_rect(Rect2(0,0,1280,800),Color(0.02,0.08,0.05,0.65))
 	panel(Rect2(425,245,430,304),INK,18,GOLD)
 	center(Rect2(450,275,380,47),"Coffee break.",36,CREAM,serif)
+	if game.focus_paused: center(Rect2(444,316,392,25),"Paused when you left the game.",13,MUTED)
 	button(Rect2(464,349,352,46),"BACK TO THE FAIRWAY","resume",false,true)
 	button(Rect2(464,410,352,42),"How to swing","help")
 	button(Rect2(464,466,352,42),"End round & return to menu","menu")
@@ -681,11 +709,13 @@ func _action(action: String) -> void:
 		"confirmname": game._accept_name_entry()
 		"leaderboard": game.record_tees=game.tees; game.state="leaderboard"
 		"closeleaderboard": game.state="menu"
-		"help": game.help_open=true; game.dragging=false; game.keyboard_charge=false
+		"help": game.help_open=true; game.cancel_swing_input()
 		"closehelp": game.help_open=false
 		"sound": game.toggle_sound()
-		"remote": game.remote_timing_enabled=not game.remote_timing_enabled
-		"parsec": game.parsec_setup_open=true
+		"remote":
+			if not game.is_web(): game.remote_timing_enabled=not game.remote_timing_enabled
+		"parsec":
+			if not game.is_web(): game.parsec_setup_open=true
 		"openparsec": game.open_parsec()
 		"closeparsec": game.parsec_setup_open=false
 		"club": game.change_club(value)
@@ -701,10 +731,10 @@ func _action(action: String) -> void:
 			if game.state=="finished" and game.mode==2: game.start_round()
 		"card":
 			if game.state=="aim" and not game.practice_active:
-				game.dragging=false; game.keyboard_charge=false; game.score_return="aim"; game.state="scorecard"
+				game.cancel_swing_input(); game.score_return="aim"; game.state="scorecard"
 		"next": game.next_hole()
 		"pause":
-			if game.state in ["aim","flight","result"]: game.previous_state=game.state; game.state="pause"; game.dragging=false; game.keyboard_charge=false
-		"resume": game.state=game.previous_state
+			game.pause_play()
+		"resume": game.resume_play()
 		"menu": game.return_to_menu()
 	queue_redraw()

@@ -1,0 +1,16 @@
+{
+  "name": "breakfast-balls-web",
+  "version": "0.9.0",
+  "private": true,
+  "description": "Browser build and journey checks for the Godot Breakfast Balls game",
+  "type": "module",
+  "scripts": {
+    "postinstall": "node -e \"require('node:fs').writeFileSync('node_modules/.gdignore', '')\"",
+    "build": "python3 tools/build_web.py",
+    "serve": "python3 tools/serve_web.py",
+    "test:web": "node tests/web_journey.mjs"
+  },
+  "devDependencies": {
+    "playwright": "1.63.0"
+  }
+}

@@ -1,0 +1,98 @@
+name: Build web artifact
+
+# Manual portable build only. Production publishing uses tools/deploy_web.py.
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: breakfast-balls-web-build
+  cancel-in-progress: false
+
+env:
+  GODOT_VERSION: "4.7.2"
+
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    permissions:
+      contents: read
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Install verified official Godot editor and web templates
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          import hashlib
+          import os
+          from pathlib import Path
+          import shutil
+          import urllib.request
+          import zipfile
+
+          version = os.environ["GODOT_VERSION"]
+          release = version + "-stable"
+          base_url = "https://github.com/godotengine/godot-builds/releases/download/" + release + "/"
+          work = Path(os.environ["RUNNER_TEMP"]) / "godot-web-toolchain"
+          work.mkdir(parents=True, exist_ok=True)
+          editor_name = "Godot_v" + release + "_linux.x86_64.zip"
+          templates_name = "Godot_v" + release + "_export_templates.tpz"
+          sums_path = work / "SHA512-SUMS.txt"
+          urllib.request.urlretrieve(base_url + sums_path.name, sums_path)
+          sums = {}
+          for line in sums_path.read_text().splitlines():
+              fields = line.split()
+              if len(fields) == 2:
+                  sums[fields[1].lstrip("*")] = fields[0].lower()
+          for name in (editor_name, templates_name):
+              expected = sums.get(name)
+              if expected is None or len(expected) != 128:
+                  raise SystemExit("Official checksum is missing or invalid for " + name)
+              archive = work / name
+              urllib.request.urlretrieve(base_url + name, archive)
+              digest = hashlib.sha512()
+              with archive.open("rb") as source:
+                  for chunk in iter(lambda: source.read(1024 * 1024), b""):
+                      digest.update(chunk)
+              if digest.hexdigest() != expected:
+                  raise SystemExit("SHA-512 mismatch for " + name)
+              print("Verified " + name, flush=True)
+
+          binary_name = "Godot_v" + release + "_linux.x86_64"
+          binary = work / "godot"
+          with zipfile.ZipFile(work / editor_name) as archive:
+              with archive.open(binary_name) as source, binary.open("wb") as target:
+                  shutil.copyfileobj(source, target)
+          binary.chmod(0o755)
+
+          templates = Path.home() / ".local/share/godot/export_templates" / (version + ".stable")
+          templates.mkdir(parents=True, exist_ok=True)
+          with zipfile.ZipFile(work / templates_name) as archive:
+              for name in ("web_nothreads_debug.zip", "web_nothreads_release.zip"):
+                  with archive.open("templates/" + name) as source, (templates / name).open("wb") as target:
+                      shutil.copyfileobj(source, target)
+          with Path(os.environ["GITHUB_ENV"]).open("a") as target:
+              target.write("GODOT=" + str(binary) + "\n")
+          PY
+
+      - name: Build browser edition
+        run: python3 tools/build_web.py
+
+      - name: Record build manifest
+        run: cat builds/web/build-info.json
+
+      - name: Upload portable website archive
+        uses: actions/upload-artifact@v7.0.1
+        with:
+          name: breakfast-balls-web
+          path: builds/breakfast-balls-web.zip
+          if-no-files-found: error
+          compression-level: 0
+          retention-days: 14
