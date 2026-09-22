@@ -107,7 +107,7 @@ func run() -> void:
 		game.state="result"; game.advance_turn(); game.next_hole()
 	check(game.state=="finished","full round finishes")
 	check(game.total_score(0)==72 and game.total_score(3)==126,"18-hole totals")
-	check(game.winners_text().begins_with("Tommy"),"stroke winner determined")
+	check(game.winners_text().begins_with(Data.GOLFERS[0][0]),"stroke winner determined")
 	# Exercise the actual event path: pull down, push forward, release.
 	game.player_count=1; game.mode=0; start_test_round()
 	var press:=InputEventMouseButton.new()

@@ -3,7 +3,7 @@
   'use strict';
   const $ = (id) => document.getElementById(id);
   const storageKey = 'breakfast-balls-online-v1';
-  const golfers = ['Tommy Beatswood', 'Thotty Scheffler', 'Rory Whacklroy', 'Ballin Morikowa', 'Jon Rahmlette', 'Bready Couples', 'Justin Thyme', 'Bubba Waffles'];
+  const golfers = ['Ernie Eggs', 'Thotty Scheffler', 'Rory Whacklroy', 'Ballin Morikowa', 'Jon Rahmlette', 'Bready Couples', 'Justin Thyme', 'Bubba Waffles'];
   const modes = ['Stroke play', 'Skins', 'Pin Challenge'];
   let credentials = null;
   let room = null;

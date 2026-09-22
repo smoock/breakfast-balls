@@ -24,7 +24,7 @@ const CLUBS = [
 	["Lob Wedge", "LW", 85.0, 57.0, true], ["Putter", "PT", 35.0, 0.0, true]
 ]
 const GOLFERS = [
-	["Tommy Beatswood", "Fairway DJ", "#e6b95c"],
+	["Ernie Eggs", "Fairway DJ", "#e6b95c"],
 	["Thotty Scheffler", "Certified pin seeker", "#e8998d"],
 	["Rory Whacklroy", "Grip it. Rip it. Brunch.", "#9bbddb"],
 	["Ballin Morikowa", "Fresh irons, fresh fit", "#b5c98b"],

@@ -100,7 +100,7 @@ var shot_shape: String = "STRAIGHT"
 var phrase_counts: Dictionary = {}
 var full_power_hold: float = 0.0
 var tree_hits: Dictionary = {}
-var player_tags: Array=["TOMMY","BIRDY","SLICE","BACON"]
+var player_tags: Array=["ERNIE","BIRDY","SLICE","BACON"]
 var name_entry_index: int=0
 var name_entry_value: String=""
 var leaderboard: Dictionary={}
@@ -276,7 +276,7 @@ func _default_leaderboard() -> Dictionary:
 		"front_nine":{"value":999,"name":"-----","detail":"No front nine recorded"},
 		"back_nine":{"value":999,"name":"-----","detail":"No back nine recorded"},
 		"course_total":{"value":999,"name":"-----","detail":"No full round recorded"},
-		"last_tags":["TOMMY","BIRDY","SLICE","BACON"]
+		"last_tags":["ERNIE","BIRDY","SLICE","BACON"]
 	}
 
 func _load_leaderboard() -> void:
