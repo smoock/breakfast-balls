@@ -37,6 +37,11 @@ def main():
     actual = subprocess.check_output([binary, "--version"], text=True).strip()
     if not actual.startswith(VERSION + ".stable."):
         raise SystemExit(f"Expected Godot {VERSION}.stable; found {actual}")
+    # Generated exports and browser screenshots must not become imported game assets.
+    for name in ("builds", "test-results"):
+        folder = ROOT / name
+        folder.mkdir(exist_ok=True)
+        (folder / ".gdignore").touch()
     print("Engine: " + actual, flush=True)
     base = [binary, "--headless", "--path", str(ROOT)]
     run(base + ["--editor", "--import"], "Import project and assets", godot=True)
