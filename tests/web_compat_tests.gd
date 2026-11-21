@@ -35,8 +35,8 @@ func mouse(position: Vector2,pressed: bool) -> void:
 func run() -> void:
 	game=BrowserGame.new()
 	game.sound_enabled=false; game.records_enabled=false
-	game.preferences_path="/private/tmp/breakfast-web-test-preferences.cfg"
-	game.leaderboard_path="/private/tmp/breakfast-web-test-records.json"
+	game.preferences_path=OS.get_cache_dir()+"/breakfast-web-test-preferences.cfg"
+	game.leaderboard_path=OS.get_cache_dir()+"/breakfast-web-test-records.json"
 	root.add_child(game)
 	game.set_process(false); game.set_physics_process(false)
 	game.qa_mode=true; game.qa_step=1

@@ -290,7 +290,7 @@ func run() -> void:
 	check(game.course.base_height_at(bunker.x,bunker.y)-game.course.height_at(bunker.x,bunker.y)>1.0,"bunker has physical terrain depth")
 	# Local record ordering and five-character tag handoff use a disposable file.
 	game.leaderboard=game._default_leaderboard()
-	game.leaderboard_path="/private/tmp/breakfast-balls-test-leaderboard.json"
+	game.leaderboard_path=OS.get_cache_dir()+"/breakfast-balls-test-leaderboard.json"
 	game.records_enabled=true
 	check(game._record("longest_drive",275,false,"BACON","275 yd drive"),"first valid drive sets local record")
 	check(not game._record("longest_drive",270,false,"SLICE","270 yd drive"),"shorter drive does not replace record")

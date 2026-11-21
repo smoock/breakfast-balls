@@ -23,8 +23,8 @@ func check(ok: bool,label: String) -> void:
 func build_game() -> Node3D:
 	var game=Main.new()
 	game.sound_enabled=false; game.records_enabled=true
-	game.preferences_path="/private/tmp/breakfast-online-preferences.cfg"
-	game.leaderboard_path="/private/tmp/breakfast-online-records.json"
+	game.preferences_path=OS.get_cache_dir()+"/breakfast-online-preferences.cfg"
+	game.leaderboard_path=OS.get_cache_dir()+"/breakfast-online-records.json"
 	root.add_child(game)
 	game.set_process(false); game.set_physics_process(false)
 	game.qa_mode=true; game.qa_step=1

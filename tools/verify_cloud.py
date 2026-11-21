@@ -37,8 +37,6 @@ def main():
     actual = subprocess.check_output([binary, "--version"], text=True).strip()
     if not actual.startswith(VERSION + ".stable."):
         raise SystemExit(f"Expected Godot {VERSION}.stable; found {actual}")
-    if not Path("/private/tmp").is_dir():
-        raise SystemExit("Test fixture directory /private/tmp is missing. Run tools/setup_cloud.sh on Linux.")
     print("Engine: " + actual, flush=True)
     base = [binary, "--headless", "--path", str(ROOT)]
     run(base + ["--editor", "--import"], "Import project and assets", godot=True)

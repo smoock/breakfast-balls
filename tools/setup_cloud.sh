@@ -23,18 +23,14 @@ fi
 export PATH="$HOME/.local/bin:$PATH"
 python3 tools/install_cloud_godot.py
 npm ci
-npx playwright install --with-deps chromium
-
-# Existing game fixtures use macOS's /private/tmp path. Keep them working on Linux.
-if [[ ! -d /private/tmp ]]; then
-  if [[ -w / ]]; then
-    mkdir -p /private/tmp
-    chmod 1777 /private/tmp
-  else
-    sudo mkdir -p /private/tmp
-    sudo chmod 1777 /private/tmp
-  fi
+# Cloud task users may lack root access; the base image already provides browser libraries.
+if [[ "$(id -u)" == 0 ]] || { command -v sudo >/dev/null && sudo -n true 2>/dev/null; }; then
+  npx playwright install --with-deps chromium
+else
+  npx playwright install chromium
 fi
+# Fail with Playwright's missing-library diagnostics if this base image isn't sufficient.
+node --input-type=module -e 'import { chromium } from "playwright"; const browser = await chromium.launch({channel: "chromium", headless: true}); console.log("Chromium launch passed"); await browser.close();'
 
 python3 tools/verify_cloud.py
 echo 'Cloud tools ready. For a web build: python3 tools/verify_cloud.py --build-web'
